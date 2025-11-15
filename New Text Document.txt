@@ -1,0 +1,624 @@
+نگاه می‌کنم به نتایج شما و می‌بینم مشکل اصلی چیست - مدل شما روی coarse categories (Ethos با recall 0.99، Pathos/Other 0.99) عالی عمل می‌کند اما روی fine-grained techniques فاجعه است. Bandwagon فقط precision 0.05 دارد، Red Herring و Obfuscation تقریباً صفر، و حتی techniques متوسط مثل Doubt و Repetition زیر 0.10 هستند. این pattern نشان می‌دهد که مدل شما یاد گرفته در hierarchy بالا بماند و ریسک نکند پایین برود.
+مقایسه با HierarchyEverywhere (رتبه ۱ با hF1=0.746) نشان می‌دهد شما حدود ۱۵-۲۰٪ عقب‌تر هستید. اما نکته جالب این است که precision شما روی Ethos/Pathos/Logos خیلی خوب است - یعنی foundation قوی دارید اما در descent کردن به سطوح پایین‌تر مشکل دارید.
+چرا techniques قبلی کار نکرده‌اند
+قبل از اینکه به knowledge graph برسم، باید بفهمیم چرا کارهای قبلی بی‌اثر بودند. Caption generation احتمالاً کار کرده اما شاید GPT-4 Vision کپشن‌هایی تولید کرده که خود propaganda techniques را لو می‌دهد (مثلاً "این تصویر از ترس استفاده می‌کند") به جای اینکه فقط محتوا را توصیف کند. Focal loss با gamma=2 شاید کافی نیست - برای techniques با support زیر ۲۰ شاید gamma=4 یا ۵ لازم باشد. Hierarchical loss شما احتمالاً خیلی conservative است و مدل را تشویق نمی‌کند که confident predictions در سطوح پایین بدهد.
+اما مهم‌تر از همه، من فکر می‌کنم مشکل اساسی این است: شما implicit learning دارید اما propaganda detection نیاز به explicit reasoning دارد. مدل neural نمی‌تواند بفهمد که "اگر کسی comparison می‌کند بین موضوع اصلی و یک موضوع نامربوط برای deflection، این Whataboutism است نه Straw Man". این نیاز به logical reasoning دارد که neural networks ضعیف هستند.
+معماری Knowledge Graph + Rule-Based + LLM
+پیشنهاد من یک three-stream architecture است که هر stream یک نوع reasoning انجام می‌دهد:
+Stream 1: Neural Multimodal (همان CLIP+RoBERTa شما)
+این stream همان کاری را می‌کند که الان می‌کند - pattern recognition از روی visual و textual features. اما به جای اینکه final predictions بدهد، فقط soft evidence تولید می‌کند. مثلاً می‌گوید "من ۷۰٪ مطمئنم این Ethos است، ۴۰٪ احتمال Ad Hominem، ۲۰٪ شاید Loaded Language". این predictions را به عنوان prior probabilities نگه می‌دارید.
+Stream 2: Knowledge Graph Reasoning Engine
+اینجا شما یک knowledge graph می‌سازید که relationships بین techniques را encode می‌کند. این graph سه نوع edge دارد:
+Prerequisite edges: برخی techniques نیاز به preconditions دارند. مثلاً Appeal to Authority نیاز دارد که یک authority figure قابل شناسایی در محتوا باشد. Whataboutism نیاز به explicit comparison دارد. Transfer نیاز به visual symbolism دارد نه فقط text. شما این prerequisites را به صورت entity recognition و pattern matching چک می‌کنید.
+#	Technique	Prerequisite (شرط لازم)	Check Method
+1	Appeal to (Strong) Emotions	واژگان یا تصاویر با بار احساسی شدید (خشم، غرور، ترس، اندوه)	Emotion lexicon / sentiment analysis / visual emotion recognition
+2	Appeal to Authority	وجود مرجع یا فرد/سازمان معتبر در متن	Entity Recognition + Authority database
+3	Appeal to Fear/Prejudice	واژگان یا تصویر القاکننده ترس یا نفرت از گروه خاص	Fear lexicon + group detection
+4	Bandwagon	اشاره به رفتار جمعی ("همه انجام میدن"، "هیچ‌کس مخالف نیست")	Pattern Matching for collectivist phrases
+5	Black-and-White Fallacy / Dictatorship	تقابل دو گزینه بدون حالت میانی ("یا با ما، یا علیه ما")	Logical structure detection / contrastive patterns
+6	Causal Oversimplification	وجود رابطه علت و معلولی ساده‌سازی‌شده	Dependency parsing + causal markers ("because", "therefore")
+7	Doubt	واژگان تردید یا زیرسؤال بردن اعتبار ("maybe", "allegedly", "not sure")	Uncertainty lexicon
+8	Exaggeration / Minimisation	وجود صفات یا قیدهای اغراق‌آمیز ("always", "never", "best", "worst")	Intensity scoring
+9	Flag-Waving	نماد ملی/ایدئولوژیک (پرچم، کشور، وطن‌پرستی)	Symbol detection (image/text) + nationality entities
+10	Glittering Generalities (Virtue)	واژگان مثبت مبهم ("freedom", "honor", "justice")	Semantic pattern matching for abstract virtues
+11	Loaded Language	واژگان با بار ارزشی بالا (مثبت یا منفی)	Emotionally weighted word list
+12	Misrepresentation of Someone’s Position (Straw Man)	اشاره به موقعیت یا نظر شخص دیگر و تحریف آن	Coreference resolution + argument comparison
+13	Name Calling / Labeling	استفاده از برچسب منفی روی فرد/گروه	Entity + Adjective pairing
+14	Obfuscation / Vagueness / Confusion	جملات مبهم، بدون مرجع مشخص، اصطلاحات فنی بدون توضیح	Linguistic complexity + pronoun resolution failure
+15	Presenting Irrelevant Data (Red Herring)	تغییر ناگهانی موضوع یا اضافه‌کردن اطلاعات نامرتبط	Topic shift detection
+16	Reductio ad Hitlerum	اشاره به نازی‌ها، هیتلر یا قیاس با آن‌ها	Named entity matching ("Hitler", "Nazi")
+17	Repetition	تکرار مداوم واژه یا عبارت کلیدی	Token frequency tracking
+18	Slogans	عبارات کوتاه، ریتمیک، و تکرارشونده	Phrase length + syntactic simplicity
+19	Smears	حمله شخصی به اعتبار فرد یا گروه	Sentiment polarity toward entity
+20	Thought-Terminating Cliché	عبارت کلی برای بستن بحث ("It is what it is", "That’s just life")	Phrase pattern list
+21	Transfer	نماد یا تصویر احساسی که ارزش خاصی را منتقل می‌کند (مثل پرچم یا رهبر)	Visual symbolism detection
+22	Whataboutism	مقایسه انحرافی بین دو پدیده	Comparative pattern detection ("but what about...")
+
+حتماً 👇
+
+در این جمله، منظور از “prerequisite edges” یا پیش‌نیازهای روابط این است که برخی از تکنیک‌های اقناعی یا پروپاگاندا (مانند Appeal to Authority، Whataboutism، Transfer و غیره) فقط زمانی قابل تشخیص هستند که شرایط خاصی در محتوا وجود داشته باشد.
+
+
+
+
+ردیف	تکنیک	اموزش سریع
+1.		Appeals to emotion	چطور تشخیص دهیم؟ (آزمون سریع)
+وقتی میمی را می‌بینید، از خود بپرسید:
+1.	اولین واکنش من چیست؟ آیا قبل از اینکه حتی متن را کامل بخوانم، احساس خشم، ترس یا غرور شدید کردم؟
+2.	آیا این میم مرا به فکر وادار می‌کند یا فقط به حس کردن؟ آیا اطلاعات جدیدی به من داد یا فقط احساسات قبلی مرا تایید یا تشدید کرد؟
+3.	اگر احساسات را از آن حذف کنم، چه چیزی باقی می‌ماند؟ آیا استدلال منطقی، شواهد یا واقعیت قابل تاییدی در آن وجود دارد؟
+نکته کلیدی: اگر میم طوری طراحی شده که شما را عصبانی کند تا از یک گروه متنفر شوید، بترساند تا از یک سیاست حمایت کنید، یا مغرور کند تا هرگز از رهبر خود انتقاد نکنید، به احتمال زیاد در حال استفاده از تکنیک «توسل به احساسات شدید» است.
+
+2.		Appeal to authority
+	وقتی میمی را می‌بینید که در آن از چهره یک فرد استفاده شده، از خود بپرسید:
+1.	آیا این میم از من می‌خواهد که این حرف را به خاطر «شخصی» که آن را گفته بپذیرم، یا به خاطر «منطق» خود حرف؟
+2.	آیا این شخص واقعاً در این موضوعِ خاص، متخصص است؟ (مثلاً، آیا یک فیزیکدان (اینشتین) مرجع خوبی برای مسائل عاشقانه است؟ آیا یک بازیگر مرجع خوبی برای مسائل پزشکی است؟)
+3.	آیا منبعی وجود دارد که تایید کند این شخص واقعاً این حرف را زده است؟ (با یک جستجوی ساده می‌توان به این موضوع پی برد).
+نکته کلیدی: اگر با حذف کردن چهره آن فرد مشهور از میم، قدرت و اعتبار آن جمله به شدت کاهش یابد، به احتمال زیاد آن میم در حال استفاده از تکنیک «توسل به مرجعیت» است.
+
+3.		Bandwagon	1.	آیا این میم به من دلیل و منطق ارائه می‌دهد، یا فقط می‌گوید «بقیه» هم اینطور فکر می‌کنند؟
+2.	آیا این میم در من این حس را ایجاد می‌کند که اگر موافق نباشم، «تنها»، «احمق» یا «عقب‌مانده» هستم؟
+3.	آیا تمرکز میم بر «محبوبیت» یک ایده است، نه بر «درستی» آن ایده؟
+نکته کلیدی: اگر یک میم باعث شد شما احساس کنید که دارید از یک «جشن بزرگ»، یک «حقیقت همگانی» یا «موج مردمی» جا می‌مانید، به احتمال زیاد در حال استفاده از تکنیک Bandwagon است.
+
+4.		'Glittering generalities (Virtue)'
+	1.	آیا این میم به من می‌گوید چگونه یا چرا؟ (مثلاً اگر میم می‌گوید «پیشرفت»، آیا توضیح می‌دهد که این پیشرفت چگونه حاصل می‌شود یا اصلاً چیست؟)
+2.	آیا این کلمه (مثلاً «عدالت») آنقدر مبهم است که رقیب هم می‌تواند دقیقاً از همین کلمه برای هدف مخالف استفاده کند؟ (اگر بله، پس این یک «کلی‌گویی درخشان» است).
+3.	آیا این میم به جای شواهد، به من «حس خوب» می‌دهد؟
+نکته کلیدی: این تکنیک، یک «چک سفید امضا»ی احساسی از شما می‌گیرد. به شما یک کلمه زیبا (مانند «صلح») می‌دهد و امیدوار است شما آن را امضا کنید، بدون اینکه بپرسید «هزینه» این صلح چیست یا چگونه به دست می‌آآید.
+
+5.		Exaggeration/Minimisation'
+	1.	آیا این میم در حال ارائه یک «کاریکاتور» است؟ آیا یک ویژگی (خوب یا بد) را گرفته و آن را به شکلی غیرطبیعی بزرگ کرده است؟ (بزرگ‌نمایی)
+2.	آیا این میم در حال «عادی‌سازی» یک بحران است؟ آیا به من می‌گوید که یک مشکل جدی، در واقع «چیز مهمی نیست»؟ (کوچک‌نمایی)
+3.	آیا مقیاس و تناسب در این میم رعایت شده است؟ آیا واکنشی که نشان می‌دهد (مثلاً وحشت زیاد یا بی‌اهمیتی کامل) با واقعیت موضوع همخوانی دارد؟
+نکته کلیدی: این تکنیک با «حس تناسب» (Sense of Proportion) شما بازی می‌کند. بزرگ‌نمایی، ترس‌ها و خشم‌های شما را «باد» می‌کند و کوچک‌نمایی، نگرانی‌های مشروع شما را «خالی» می‌کند.
+
+6.		Loaded Language
+	استفاده از برچسب‌های قضاوتی (به جای توصیف)
+این رایج‌ترین شکل آن است. میم به جای توصیف یک عمل یا ایده، مستقیماً یک برچسب قضاوتی روی آن می‌زند.
+•	کلمات باردار منفی: به جای «فردی که با دولت مخالف است»، میم از کلمه «خائن» یا «دشمن» استفاده می‌کند.
+•	کلمات باردار منفی: به جای «سیاستمداری که نظرش را عوض کرده»، میم از کلمه «فاسد» یا «دروغگو» استفاده می‌کند.
+•	کلمات باردار مثبت: به جای «سربازی که در جنگ بوده»، میم از کلمه «قهرمان» یا «ناجی» استفاده می‌کند.
+1.	کلماتی مانند «آفت»، «انگل»، «هیولا»، «وحشی»، «گله» یا «ویروس»
+این بردگی مدرن است!» کلمه «بردگی» یک بار احساسی فوق‌العاده منفی دارد.
+
+آیا می‌توانم کلمه کلیدی این میم را با یک کلمه «خنثی» جایگزین کنم؟ (مثلاً «خائن» را با «مخالف» یا «هیولا» را با «فرد»)
+2.	اگر این کار را بکنم، آیا تمام قدرت و پیام میم از بین می‌رود؟
+نکته کلیدی: اگر پاسخ شما به سوال دوم «بله» است، یعنی آن میم بر پایه منطق ساخته نشده، بلکه تماماً بر «زبان باردار» و احساساتی که آن کلمه خاص در شما ایجاد می‌کند، استوار است.
+
+7.		Flag-waving
+	خصوصیت بصری:
+•	پرچم: پرچم کشور (اغلب در پس‌زمینه، یا به عنوان فیلتر روی تصویر).
+•	نمادهای حاکمیتی: نقشه کشور، سرود ملی، نمادهای رسمی (مانند عقاب، شیر و خورشید، یا موارد مشابه).
+•	شخصیت‌های تاریخی/اسطوره‌ای: تصاویر رستم، کوروش، یا هر قهرمان ملی که نماد «عظمت» گذشته است.
+•	سربازان و نظامیان: تصاویری که ارتش یا نیروهای نظامی را به عنوان محافظان «وطن» نشان می‌دهد.
+•  «وطن»، «میهن»، «ایران» (یا نام کشور)، «ملت»، «غرور ملی»، «افتخار»، «خون شهدا».
+•  و در مقابل، استفاده از کلمات مخالف برای تحقیر مخالفان: «خائن»، «وطن‌فروش»، «دشمن داخلی».
+1.	آیا استدلال اصلی این میم، بر پایه «عشق به کشور» است یا بر پایه «شواهد و منطق»؟
+2.	آیا این میم به طور ضمنی به من می‌گوید که اگر مخالف باشم، «خائن» یا «بی‌عاطفه» نسبت به کشورم هستم؟
+3.	اگر پرچم، نقشه، و کلمه «وطن» را از این میم حذف کنم، آیا هنوز هم استدلال معتبری باقی می‌ماند؟
+نکته کلیدی: اگر پاسخ شما به سوال سوم «خیر» است، آن میم به احتمال زیاد در حال استفاده از تکنیک Flag-waving است. این تکنیک از شما می‌خواهد که به جای فکر کردن با مغزتان، با «خون» خود (به عنوان یک عضو ملت) تصمیم بگیرید
+
+8.	 	  Appeal to fear/prejudice
+	•  
+
+میم به شما می‌گوید که از [گروه متعصبانه X] بترسید، زیرا آنها می‌خواهند [فاجعه Y] را بر سر شما بیاورند.
+آیا این میم دارد مرا می‌ترساند؟ آیا به من می‌گوید که یک فاجعه در راه است اگر کاری نکنم؟ (این ترس است).
+•  آیا این میم برای این ترس، یک «چهره» یا «گروه» خاص را معرفی می‌کند؟ آیا به من می‌گوید که «چه کسانی» عامل این ترس هستند؟ (این تعصب است).
+•  آیا میم شواهد منطقی ارائه می‌دهد، یا فقط به کلیشه‌ها و احساسات من تکیه می‌کند؟
+
+9.		Repetition
+	•  
+
+خصوصیت: متن میم، یک استدلال پیچیده نیست، بلکه یک «هشتگ» یا یک «شعار» قابل تکرار است. (مثلاً: «[X] را متوقف کنید»، «[Y] را پس بگیرید»، «او دروغ می‌گوید»).
+آیا این چندمین باری است که این «پیام» دقیق را (در قالب‌های مختلف) در این هفته می‌بینم؟
+•  آیا متن این میم، بیشتر شبیه یک «شعار» قابل تکرار است تا یک استدلال؟
+•  آیا حس می‌کنم این پیام به طور «مصنوعی» و ناگهانی همه‌گیر شده است؟
+
+10.		Obfuscation, Intentional vagueness, Confusion
+	گیجی بی ربط بودن 
+•  اگر این میم را با یک نفر دیگر به اشتراک بگذارم، آیا هر دوی ما برداشت متفاوتی از «پیام اصلی» خواهیم داشت؟ (اگر بله، ابهام وجود دارد).
+•  آیا این میم عمداً به من احساس «خستگی مغزی» می‌دهد؟ آیا سعی می‌کند یک موضوع ساده را غیرقابل توضیح یا یک موضوع پیچیده را به صورت بی‌معنی بیان کند؟ (اگر بله، سردرگمی و پوشاندن حقیقت اتفاق افتاده است).
+•  اگر حقایق و شواهد این میم را بخواهم، آیا می‌توانم به یک منبع دقیق و قابل تأیید برسم؟ (اگر خیر، اطلاعات پنهان یا مبهم هستند)
+
+11.			
+12.		Name calling/Labeling
+	•	 از کلمات با بار احساسی منفی برای تحقیر، توهین و رد کردن یک فرد یا ایده استفاده می‌کند
+
+
+تحریک نفرت یا انزجار در مخاطب تا او به جای نقد منطقی، به طور خودکار آن ایده یا فرد را رد کند.
+
+«دیکتاتور»، «فاسد»، «احمق»، «عروسک خیمه‌شب‌بازی» یا «خائن».
+•	به جای «نظریه اقتصادی متفاوت»، میم می‌گوید: «کمونیسم»، «سوسیالیسم شکست‌خورده» یا «کاپیتالیسم حریص»
+•	خصوصیت بصری: تصویر کردن افراد یا گروه‌ها به شکل حیوانات موذی (مانند موش، خوک، سگ)، یا اشیاء نفرت‌انگیز (مانند زباله، ویروس، انگل) تا مخاطب به راحتی با انسانیت آن‌ها قطع ارتباط کند
+
+خصوصیت: میم به جای رد کردن یک ایده، به طور پیش‌فرض به شخص می‌گوید: «هر چیزی که این احمقِ فاسد می‌گوید، دروغ است.» این برچسب منفی، هر گونه پیام آتی آن فرد را از پیش «مسموم» می‌کند.
+•	
+آیا می‌توانم این میم را با حذف تمام القاب منفی، بازنویسی کنم؟ (مثلاً «این دزد می‌گوید...» را به «این شخص می‌گوید...» تغییر دهم).
+•	اگر این کار را انجام دهم، آیا چیزی برای نقد باقی می‌ماند؟
+•	آیا میم به من دلیل می‌دهد که چرا آن ایده بد است، یا فقط می‌گوید که «چه کسی» آن را گفته است؟
+•	.
+13.		doubt	«آن‌ها حقیقت را از شما پنهان می‌کنند»، «رسانه‌های جریان اصلی دروغ می‌گویند»، «کارشناسان اجیر شده‌اند» یا «این چیزی است که دولت از شما می‌خواهد باور کنید».
+
+اگر [حادثه X] واقعاً اتفاق افتاد، پس چرا [شخص Y] آن روز در [مکان Z] بود؟ به نظر عجیب نمی‌آید؟»
+
+•  آیا این میم مستقیماً یک واقعیت را رد می‌کند یا فقط مرا به «بی‌اعتماد بودن» نسبت به کسانی که آن واقعیت را می‌گویند، تشویق می‌کند؟
+•  آیا میم به جای ارائه یک نظریه متقاعدکننده، فقط مجموعه‌ای از سؤالات و تناقضات جزئی را مطرح می‌کند؟
+•  آیا میم یک منبع جایگزین معتبر برای حقیقت ارائه می‌دهد، یا فقط می‌گوید «به هیچ‌کس اعتماد نکن»؟
+
+14.		smears	•  آیا این میم به من در مورد «ایده‌ها» یا «عملکرد» فرد اطلاعات می‌دهد، یا فقط به «شخصیت» و «اخلاقیات» او حمله می‌کند؟
+•  آیا اتهامات مطرح شده (مانند دزدی، خیانت، بیماری) آنقدر جدی و شدید هستند که اگر واقعی بودند، باید در اخبار رسمی مطرح می‌شدند، اما صرفاً در قالب یک میم منتشر شده‌اند؟
+•  آیا این میم باعث می‌شود من احساس «نفرت» یا «انزجار» شدید نسبت به آن فرد پیدا کنم تا دیگر حرفش را نشنوم؟
+
+15.		Reductio ad hitlerum
+	•  استفاده مستقیم یا مونتاژ شده از تصویر آدولف هیتلر یا سایر جنایتکاران بزرگ تاریخ.
+•  استفاده از صلیب شکسته (سواستیکا) یا سایر نمادهای نازی‌ها.
+•  استفاده از لباس‌های نظامی یا یونیفرم‌های مرتبط با رژیم‌های سرکوبگر و فاشیست.
+•  «شما طرفدار [سیاست اقتصادی X] هستید؟ هیتلر هم همین کار را کرد.»
+•  «طرفداران [سیاست اجتماعی Y] دقیقاً مانند نیروهای اس‌اس نازی عمل می‌کنند.»
+•  آیا شباهت بین موضع میم و عمل هیتلر، واقعاً در «اصل و منطق» مشترک است، یا فقط در یک «ویژگی سطحی» و تصادفی؟ (مثلاً: بله، هیتلر هم نفس می‌کشید، اما این نباید نفس کشیدن را شیطانی کند).
+•  آیا هدف میم، آموزش تاریخ است یا صرفاً ایجاد انزجار شدید نسبت به مخالف خود؟
+•  اگر نام «هیتلر» و نمادهای نازی را از میم حذف کنید، آیا هنوز هم استدلال منطقی قوی باقی می‌ماند؟
+
+16.		'Whataboutism
+	این سخت بود نمیدونم اینو
+میم دو موضوع کاملاً متفاوت را که از نظر ماهیت، مقیاس، یا زمان وقوع هیچ ربطی به هم ندارند، کنار هم می‌گذارد
+17.			
+18.		Misrepresentation of Someone's Position (Straw Man)
+	سیاست اقتصادی پیچیده X] را برای کمک به فقرا اجرا کنیم»، میم فقط می‌گوید: «آن‌ها فکر می‌کنند کافی است پول از آسمان ببارد تا فقر از بین برود.
+•  آیا این موضع، واقعاً چیزی است که من یا طرفداران واقعی آن ایده می‌گوییم؟
+•  آیا این میم تمام پیچیدگی‌ها، استثناها، یا اهداف اعلام شده موضع مخالف را نادیده گرفته و آن را به یک جمله احمقانه تبدیل کرده است؟
+•  آیا نقد میم، بیشتر بر پایه «آنچه آن‌ها باید می‌گفتند» است یا بر پایه «آنچه واقعاً گفته‌اند»؟
+
+19.			
+20.			
+21.			
+22.			
+
+به زبان ساده، قبل از اینکه مدل یا سیستم بتواند بگوید «در این متن تکنیک فلان وجود دارد»، باید بررسی کند که آیا نشانه‌های لازم برای آن تکنیک در داده (متن، تصویر یا ویدیو) حاضر است یا نه.
+حالا بیایید مثال‌ها را دقیق‌تر باز کنیم 👇
+________________________________________
+🧩 ۱. Appeal to Authority (توسل به مقام یا مرجع)
+پیش‌نیاز: وجود یک authority figure یا مرجع قابل شناسایی در متن.
+•	یعنی سیستم باید بفهمد که در محتوا به فرد یا سازمانی اشاره شده که جایگاه تخصصی یا قدرت دارد (مثلاً "دانشمندان ناسا می‌گویند..." یا "پروفسور اسمیت تأکید می‌کند...").
+•	اگر چنین مرجعی وجود نداشته باشد، حتی اگر جمله قوی به نظر برسد، نمی‌توان گفت Appeal to Authority رخ داده.
+👉 برای تشخیص این پیش‌نیاز، از entity recognition (تشخیص نام موجودیت‌ها مثل افراد، سازمان‌ها، دانشگاه‌ها) استفاده می‌شود. مدل باید تشخیص دهد که «NASA»، «Dr. Smith»، «Harvard» و ... موجودیت‌های دارای اعتبار هستند.
+________________________________________
+🔁 ۲. Whataboutism (مقایسه انحرافی)
+پیش‌نیاز: وجود یک مقایسه صریح یا ضمنی بین دو پدیده.
+•	مثلاً در جمله "شما از ما انتقاد می‌کنید، اما کشور خودتان چی؟"
+سیستم باید متوجه شود که دو مورد در حال مقایسه‌اند (ما ↔ شما).
+•	بنابراین باید به دنبال patterns مقایسه‌ای باشد مثل:
+o	"but what about...", "while you...", "compared to...", "on the other hand...", یا حتی ساختارهای معنایی مشابه در فارسی.
+👉 این پیش‌نیاز معمولاً با pattern matching و تحلیل dependency parsing (روابط نحوی بین اجزا) بررسی می‌شود تا مشخص شود دو چیز در حال مقایسه هستند.
+________________________________________
+🎨 ۳. Transfer (انتقال احساس یا نمادگرایی)
+پیش‌نیاز: وجود نماد یا تصویر بصری که حس یا ارزش خاصی را منتقل می‌کند.
+•	مثلاً در پوستر، پرچم، صلیب، یا رنگ خاصی که با یک مفهوم احساسی همراه است.
+•	اگر محتوا فقط متن باشد (بدون نماد یا نشانه‌ی بصری)، Transfer نمی‌تواند رخ دهد.
+👉 اینجا مدل باید با visual symbolism detection کار کند؛ یعنی تشخیص دهد آیا در تصویر نمادهایی (مثل پرچم، عقاب، رنگ قرمز خون، یا چهره رهبر) وجود دارند که به مفاهیم احساسی منتقل می‌شوند.
+________________________________________
+🧠 جمع‌بندی:
+بنابراین، «بررسی prerequisites» یعنی قبل از تشخیص نوع تکنیک، سیستم باید با entity recognition + pattern matching + multimodal checks بسنجد که شرایط لازم برای بروز آن تکنیک وجود دارد یا نه.
+به‌صورت خلاصه:
+Technique	Prerequisite	Method
+Appeal to Authority	Authority figure detected	Entity Recognition
+Whataboutism	Explicit/implicit comparison	Pattern Matching
+Transfer	Visual or symbolic imagery	Visual Symbolism Detection
+________________________________________
+اگر خواستی، می‌تونم این منطق رو به صورت نمودار جریان (flowchart) یا شبه‌کد (pseudocode) برات بنویسم تا واضح‌تر ببینی چطور در سیستم چک می‌شه.
+می‌خوای اون رو هم اضافه کنم؟
+خیلی عالی 👏 دقیقاً این فهرستی هست که توی پژوهش‌های NLP مثل SemEval Propaganda Detection استفاده می‌شه.
+پس حالا بر اساس همین ۲۲ تکنیک، برات می‌نویسم:
+•	پیش‌نیاز (Prerequisite) هر تکنیک
+•	روش بررسی (Pattern / Entity Recognition / Symbolism / Contextual Cues)
+•	و در پایان، یک شبه‌کد (pseudocode) کلی که نشون می‌ده چطور سیستم به ترتیب این پیش‌نیازها رو چک می‌کنه.
+________________________________________
+🧩 ۲۲ Propaganda Techniques — Prerequisites & Detection Logic
+#	Technique	Prerequisite (شرط لازم)	Check Method
+1	Appeal to (Strong) Emotions	واژگان یا تصاویر با بار احساسی شدید (خشم، غرور، ترس، اندوه)	Emotion lexicon / sentiment analysis / visual emotion recognition
+2	Appeal to Authority	وجود مرجع یا فرد/سازمان معتبر در متن	Entity Recognition + Authority database
+3	Appeal to Fear/Prejudice	واژگان یا تصویر القاکننده ترس یا نفرت از گروه خاص	Fear lexicon + group detection
+4	Bandwagon	اشاره به رفتار جمعی ("همه انجام میدن"، "هیچ‌کس مخالف نیست")	Pattern Matching for collectivist phrases
+5	Black-and-White Fallacy / Dictatorship	تقابل دو گزینه بدون حالت میانی ("یا با ما، یا علیه ما")	Logical structure detection / contrastive patterns
+6	Causal Oversimplification	وجود رابطه علت و معلولی ساده‌سازی‌شده	Dependency parsing + causal markers ("because", "therefore")
+7	Doubt	واژگان تردید یا زیرسؤال بردن اعتبار ("maybe", "allegedly", "not sure")	Uncertainty lexicon
+8	Exaggeration / Minimisation	وجود صفات یا قیدهای اغراق‌آمیز ("always", "never", "best", "worst")	Intensity scoring
+9	Flag-Waving	نماد ملی/ایدئولوژیک (پرچم، کشور، وطن‌پرستی)	Symbol detection (image/text) + nationality entities
+10	Glittering Generalities (Virtue)	واژگان مثبت مبهم ("freedom", "honor", "justice")	Semantic pattern matching for abstract virtues
+11	Loaded Language	واژگان با بار ارزشی بالا (مثبت یا منفی)	Emotionally weighted word list
+12	Misrepresentation of Someone’s Position (Straw Man)	اشاره به موقعیت یا نظر شخص دیگر و تحریف آن	Coreference resolution + argument comparison
+13	Name Calling / Labeling	استفاده از برچسب منفی روی فرد/گروه	Entity + Adjective pairing
+14	Obfuscation / Vagueness / Confusion	جملات مبهم، بدون مرجع مشخص، اصطلاحات فنی بدون توضیح	Linguistic complexity + pronoun resolution failure
+15	Presenting Irrelevant Data (Red Herring)	تغییر ناگهانی موضوع یا اضافه‌کردن اطلاعات نامرتبط	Topic shift detection
+16	Reductio ad Hitlerum	اشاره به نازی‌ها، هیتلر یا قیاس با آن‌ها	Named entity matching ("Hitler", "Nazi")
+17	Repetition	تکرار مداوم واژه یا عبارت کلیدی	Token frequency tracking
+18	Slogans	عبارات کوتاه، ریتمیک، و تکرارشونده	Phrase length + syntactic simplicity
+19	Smears	حمله شخصی به اعتبار فرد یا گروه	Sentiment polarity toward entity
+20	Thought-Terminating Cliché	عبارت کلی برای بستن بحث ("It is what it is", "That’s just life")	Phrase pattern list
+21	Transfer	نماد یا تصویر احساسی که ارزش خاصی را منتقل می‌کند (مثل پرچم یا رهبر)	Visual symbolism detection
+22	Whataboutism	مقایسه انحرافی بین دو پدیده	Comparative pattern detection ("but what about...")
+________________________________________
+⚙️ Pseudocode: Checking Prerequisite Edges
+for technique in propaganda_techniques:
+    content_features = extract_features(content)
+    
+    if technique == "Appeal to Authority":
+        if detect_entities(content_features, type="authority"):
+            mark_as_candidate("Appeal to Authority")
+
+    elif technique == "Whataboutism":
+        if detect_comparative_pattern(content_features):
+            mark_as_candidate("Whataboutism")
+
+    elif technique == "Transfer":
+        if detect_visual_symbolism(content_features):
+            mark_as_candidate("Transfer")
+
+    elif technique == "Flag-Waving":
+        if detect_national_symbols(content_features):
+            mark_as_candidate("Flag-Waving")
+
+    elif technique == "Straw Man":
+        if detect_argument_reference(content_features):
+            if detect_argument_distortion(content_features):
+                mark_as_candidate("Straw Man")
+
+    # ... (similar checks for remaining techniques)
+
+final_predictions = classifier.predict(only_candidates(content_features))
+________________________________________
+💡 خلاصه‌ی منطق کلی:
+1.	ویژگی‌ها استخراج می‌شوند از متن و تصویر (entities, sentiment, syntax, symbols, etc).
+2.	پیش‌نیازها بررسی می‌شوند با قواعد (rule-based) مثل pattern matching یا entity recognition.
+3.	فقط محتواهایی که پیش‌نیازشان برقرار است، به مدل یادگیری (classifier) داده می‌شوند تا برچسب نهایی تکنیک را پیش‌بینی کند.
+4.	این کار باعث می‌شود دقت بالا رود و مدل از تشخیص‌های اشتباه در جملات عادی جلوگیری کند.
+________________________________________
+آیا دوست داری من این جدول رو تبدیل کنم به یک نسخه ساختاریافته‌تر (مثلاً JSON یا جدول YAML) تا بعداً در کد یا مقاله‌ات استفاده کنی؟
+عالی 👏
+در اینجا نسخه‌ی کامل و ساختاریافته‌ی JSON برای هر ۲۲ تکنیک رو برات نوشتم — شامل نام تکنیک، پیش‌نیاز (prerequisite) و روش بررسی (check_method).
+این JSON کاملاً آماده است تا در مقاله، سیستم تشخیص، یا حتی در کد (مثلاً Python) استفاده بشه 👇
+________________________________________
+{
+  "propaganda_techniques": [
+    {
+      "name": "Appeal to (Strong) Emotions",
+      "prerequisite": "Presence of emotionally charged words or visuals (anger, pride, fear, sadness).",
+      "check_method": ["emotion_lexicon", "sentiment_analysis", "visual_emotion_recognition"]
+    },
+    {
+      "name": "Appeal to Authority",
+      "prerequisite": "A recognizable authority figure or organization is mentioned.",
+      "check_method": ["entity_recognition", "authority_database_lookup"]
+    },
+    {
+      "name": "Appeal to Fear/Prejudice",
+      "prerequisite": "Language or imagery that evokes fear or hatred toward a group or threat.",
+      "check_method": ["fear_lexicon", "group_reference_detection"]
+    },
+    {
+      "name": "Bandwagon",
+      "prerequisite": "Presence of collective behavior or conformity statements (e.g., 'everyone does it').",
+      "check_method": ["pattern_matching_collectivism"]
+    },
+    {
+      "name": "Black-and-White Fallacy/Dictatorship",
+      "prerequisite": "Binary contrast with no middle ground (e.g., 'with us or against us').",
+      "check_method": ["contrastive_pattern_detection", "logical_structure_analysis"]
+    },
+    {
+      "name": "Causal Oversimplification",
+      "prerequisite": "Presence of causal connection markers ('because', 'therefore') linking complex events simplistically.",
+      "check_method": ["dependency_parsing", "causal_marker_detection"]
+    },
+    {
+      "name": "Doubt",
+      "prerequisite": "Use of uncertain or skeptical expressions ('maybe', 'allegedly', 'not sure').",
+      "check_method": ["uncertainty_lexicon"]
+    },
+    {
+      "name": "Exaggeration/Minimisation",
+      "prerequisite": "Presence of extreme adjectives/adverbs ('always', 'never', 'best', 'worst').",
+      "check_method": ["intensity_scoring"]
+    },
+    {
+      "name": "Flag-waving",
+      "prerequisite": "Reference to national symbols, identity, or patriotic sentiment.",
+      "check_method": ["symbol_detection", "nationality_entity_recognition"]
+    },
+    {
+      "name": "Glittering Generalities (Virtue)",
+      "prerequisite": "Use of vague but positive concepts ('freedom', 'honor', 'justice').",
+      "check_method": ["semantic_pattern_matching", "virtue_wordlist_check"]
+    },
+    {
+      "name": "Loaded Language",
+      "prerequisite": "Use of emotionally charged or evaluative language.",
+      "check_method": ["emotionally_weighted_wordlist"]
+    },
+    {
+      "name": "Misrepresentation of Someone's Position (Straw Man)",
+      "prerequisite": "Mention of another person’s viewpoint followed by distorted restatement.",
+      "check_method": ["coreference_resolution", "argument_comparison"]
+    },
+    {
+      "name": "Name Calling/Labeling",
+      "prerequisite": "Negative labels or adjectives attached to a person or group.",
+      "check_method": ["entity_adjective_pairing", "sentiment_analysis"]
+    },
+    {
+      "name": "Obfuscation, Intentional Vagueness, Confusion",
+      "prerequisite": "Ambiguous statements or undefined references.",
+      "check_method": ["linguistic_complexity_analysis", "pronoun_resolution_failure"]
+    },
+    {
+      "name": "Presenting Irrelevant Data (Red Herring)",
+      "prerequisite": "Sudden topic shift or introduction of unrelated information.",
+      "check_method": ["topic_shift_detection", "semantic_relevance_check"]
+    },
+    {
+      "name": "Reductio ad Hitlerum",
+      "prerequisite": "Explicit reference to Nazis, Hitler, or fascism in comparison.",
+      "check_method": ["named_entity_matching"]
+    },
+    {
+      "name": "Repetition",
+      "prerequisite": "Reappearance of key phrases or words multiple times.",
+      "check_method": ["token_frequency_tracking"]
+    },
+    {
+      "name": "Slogans",
+      "prerequisite": "Short, catchy, and rhythmic phrase used for persuasion.",
+      "check_method": ["phrase_length_check", "syntactic_simplicity"]
+    },
+    {
+      "name": "Smears",
+      "prerequisite": "Personal attack undermining credibility of a person or group.",
+      "check_method": ["sentiment_polarity_toward_entity", "attack_verb_detection"]
+    },
+    {
+      "name": "Thought-Terminating Cliché",
+      "prerequisite": "Common cliché that shuts down discussion ('It is what it is').",
+      "check_method": ["cliche_phrase_list"]
+    },
+    {
+      "name": "Transfer",
+      "prerequisite": "Visual or symbolic association transferring emotion or value.",
+      "check_method": ["visual_symbolism_detection", "image_text_alignment"]
+    },
+    {
+      "name": "Whataboutism",
+      "prerequisite": "Explicit or implicit comparison between two unrelated cases.",
+      "check_method": ["comparative_pattern_detection", "discourse_relation_analysis"]
+    }
+  ]
+}
+________________________________________
+می‌خوای نسخه‌ی بعدی رو هم برات بنویسم که شامل “example trigger phrases” (یعنی نمونه جملاتی که هر تکنیک رو فعال می‌کنن) هم باشه؟
+اون نسخه خیلی به درد مدل‌سازی یا آموزش LLM می‌خوره.
+
+
+
+
+
+Mutual exclusion edges: برخی techniques نمی‌توانند همزمان وجود داشته باشند. مثلاً اگر Black-and-white Fallacy detected شد، احتمال Causal Oversimplification باید کاهش یابد چون هر دو در فضای "Simplification" رقابت می‌کنند.
+Co-occurrence edges: برخی techniques تقریباً همیشه با هم می‌آیند - Loaded Language + Name Calling + Smears معمولاً یک cluster هستند. اگر دو تا از سه‌تا detected شد، باید اعتماد به سومی بالا برود.
+این graph را از training data می‌سازید اما manually علاوه بر آن domain knowledge اضافه می‌کنید. سپس یک constraint satisfaction algorithm می‌نویسید که predictions مرحله ۱ را می‌گیرد و با این constraints refine می‌کند. این شبیه به Integer Linear Programming است - شما می‌خواهید labelset ای پیدا کنید که هم با neural predictions سازگار باشد (minimize deviation) و هم constraints را satisfy کند (hard constraints یا soft penalties)
+Stream 3: LLM Symbolic Reasoner
+اینجا شما از یک LLM (مثل GPT-4 یا Claude) استفاده می‌کنید اما نه برای direct classification - بلکه برای verification و explanation. شما به LLM می‌دهید:
+•	متن و caption تصویر
+•	Top-3 predictions از neural model با confidence scores
+•	Top-3 predictions از KG reasoning
+•	تعاریف دقیق هر technique
+و از LLM می‌خواهید: "با توجه به تعاریف، کدام predictions منطقی هستند و چرا؟ آیا evidence کافی برای هر prediction وجود دارد؟"
+LLM خروجی structured می‌دهد برای هر candidate technique:
+{
+  "technique": "Whataboutism",
+  "supported": false,
+  "reasoning": "متن یک مقایسه دارد اما برای argue کردن یک point است نه deflection از topic اصلی",
+  "required_evidence_missing": ["deflection from original criticism"]
+}
+این reasoning را parse می‌کنید و به صورت additional evidence به final fusion می‌دهید.
+چطور سه stream را ترکیب کنیم
+من پیشنهاد sequential fusion with feedback loops را می‌دهم نه simple voting:
+Stage 1 - Neural Priors: مدل multimodal predictions اولیه با confidence scores می‌دهد. Threshold پایینی بگذارید (مثلاً 0.15) تا candidate set بزرگ باشد.
+Stage 2 - KG Filtering: Knowledge graph این candidates را می‌گیرد و:
+•	Techniques بدون prerequisites را reject می‌کند (hard filtering)
+•	Confidence scores را با co-occurrence patterns adjust می‌کند (soft refinement)
+•	Techniques جدید که neural model miss کرده را propose می‌کند اگر evidence قوی وجود داشته باشد
+مثلاً اگر neural model "Loaded Language=0.72" و "Name Calling=0.18" داد، KG می‌بیند که این دو بالای ۸۵٪ وقت‌ها با هم می‌آیند. پس Name Calling را به 0.45 boost می‌کند.
+Stage 3 - LLM Verification: فقط برای ambiguous cases (confidence بین 0.3-0.7) یا rare techniques، LLM را فعال می‌کنید. LLM می‌تواند:
+•	تأیید کند که evidence لازم وجود دارد
+•	بین similar techniques تصمیم بگیرد (Doubt vs Whataboutism)
+•	False positives را رد کند که از spurious correlations می‌آیند
+Stage 4 - Weighted Fusion: حالا سه set از scores دارید. وزن‌ها را یاد بگیرید:
+Final_score = α * Neural_score + β * KG_score + γ * LLM_score
+اما نکته اینجاست که این وزن‌ها technique-specific باشند. برای visual-heavy techniques (Transfer, Flag-waving) شاید α=0.6، برای text-heavy (Loaded Language) شاید α=0.5 و γ=0.3، برای rare complex techniques (Whataboutism, Straw Man) شاید γ=0.5.
+این وزن‌ها را با یک meta-learner روی validation set optimize کنید.
+چگونه Knowledge Graph را بسازیم
+ساخت KG سه مرحله دارد:
+مرحله ۱ - Automatic extraction از training data: برای هر جفت technique، PMI و conditional probabilities حساب کنید: P(A|B)، P(B|A). اگر PMI > 0.3، یک co-occurrence edge بسازید. اگر P(A|B) > 0.8 اما P(B|A) < 0.3، یک directed "enables" edge بسازید (B معمولاً منجر به A می‌شود)
+مرحله ۲ - Manual knowledge engineering: از تعاریف techniques، prerequisite rules استخراج کنید. مثلاً:
+•	"Appeal to Authority" requires: entity_type=PERSON AND (has_title OR has_credential OR authority_context)
+•	"Whataboutism" requires: comparative_structure AND topic_switch AND deflection_intent
+•	"Bandwagon" requires: (popularity_claim OR crowd_imagery OR group_conformity_language)
+این rules را به صورت SPARQL queries یا اگر ساده‌تر می‌خواهید Python functions بنویسید که text/image features را check می‌کنند.
+مرحله ۳ - Entity linking و feature extraction: برای check کردن prerequisites، نیاز دارید که features مشخصی extract کنید:
+•	از RoBERTa embeddings با یک classifier سبک، linguistic patterns شناسایی کنید (comparative structures، negation، modality)
+•	از CLIP attention maps، visual elements شناسایی کنید (faces، flags، crowds، authority symbols)
+•	با NER، entities شناسایی کنید و با یک knowledge base (Wikidata) link کنید برای credential checking
+این features را پیش از neural model extract کنید و در KG reasoning استفاده کنید.
+LLM Integration Strategy
+برای کارایی، نمی‌توانید همه ۱۰۰۰ test sample را به GPT-4 بدهید - هزینه بالا و latency دارد. پس یک selective invocation strategy طراحی کنید:
+فقط LLM را صدا بزنید اگر:
+1.	Neural و KG disagreement دارند (difference > 0.3)
+2.	Technique از rare class است (support < 50 در training)
+3.	Confidence متوسط است (بین 0.3-0.7)
+4.	Multiple similar techniques احتمال بالا دارند
+برای باقی موارد، weighted fusion کافی است. این باعث می‌شود فقط ۲۰-۳۰٪ samples به LLM بروند.
+برای LLM prompting، از structured output با few-shot examples استفاده کنید. در prompt بگذارید:
+•	تعاریف دقیق سه candidate techniques
+•	سه example از training set که هر technique را نشان می‌دهند
+•	متن و caption این sample
+•	بپرسید: "کدام technique(s) حضور دارند؟ برای هرکدام، evidence مشخص بده و confidence score (0-1)"
+LLM را مجبور کنید که JSON structured output بدهد تا parsing آسان باشد.
+چگونه این approach مشکلات شما را حل می‌کند
+نگاه کنید به Bandwagon (precision=0.05) و Red Herring (precision=0.01). این نشان می‌دهد مدل شما false positives زیاد تولید می‌کند - یعنی هرچیزی که شبیه این techniques است را label می‌زند. KG reasoning با prerequisite checking این false positives را filter می‌کند. Bandwagon نیاز به explicit popularity claim یا crowd imagery دارد - اگر neural model آن را predict کرد اما این features وجود ندارند، KG آن را reject می‌کند.
+برای techniques با recall پایین (Whataboutism=0.06، Repetition=0.07) مشکل این است که neural model آن‌ها را miss می‌کند چون rare هستند. KG reasoning می‌تواند این را پیشنهاد دهد حتی اگر neural score پایین باشد - اگر pattern matching نشان می‌دهد comparative structure + topic switch وجود دارد، KG می‌تواند Whataboutism را با confidence بالا propose کند.
+برای ambiguous cases مثل Doubt vs Whataboutism (هر دو سؤال می‌کنند اما intent متفاوت دارند)، LLM reasoning می‌تواند تمایز بگذارد با فهم semantic intent - Doubt سؤال می‌کند تا اعتبار را کم کند، Whataboutism سؤال می‌کند تا attention را deflect کند.
+پیاده‌سازی عملی
+شروع کنید با یک hybrid model ساده و تدریجاً پیچیده کنید:
+نسخه ۱ (یک هفته کار): فقط KG با rule-based prerequisites اضافه کنید. Neural predictions را با binary filters (prerequisite check) refine کنید. این باید false positives را ۲۰-۳۰٪ کاهش دهد و precision را بهبود بخشد.
+نسخه ۲ (دو هفته بعد): co-occurrence edges و soft constraint satisfaction اضافه کنید. این باید recall را برای common combinations بهبود بخشد.
+نسخه ۳ (سه هفته بعد: LLM verification برای top-K ambiguous samples اضافه کنید. ابتدا با K=50 شروع کنید و ببینید آیا بهبود می‌بخشد.
+این iterative approach به شما اجازه می‌دهد که در هر مرحله ببینید کدام component چقدر کمک می‌کند و decision-making data-driven باشد.
+آیا این معماری منطقی به نظر می‌رسد؟ آیا جزئیات بیشتری درباره هر component لازم دارید؟
+
+ادامه:
+پارس کردن Reasoning یعنی چه؟
+وقتی LLM به شما یک پاسخ متنی می‌دهد مثل "این Whataboutism نیست چون deflection از موضوع اصلی وجود ندارد"، این یک string است. شما باید از این string اطلاعات ساختاریافته استخراج کنید که قابل استفاده در مدل باشد.
+دو راه دارید: راه اول این است که از LLM بخواهید خروجی را به صورت JSON بدهد (با structured output API یا prompt engineering محکم). وقتی JSON دارید، کافی است parse کنید و ببینید "supported" برای هر technique چیست - True یا False. این می‌شود یک signal دیگر.
+راه دوم که robust تر است: از LLM بخواهید برای هر technique یک score بین ۰ تا ۱ بدهد که نشان می‌دهد چقدر evidence برای آن technique کافی است. مثلاً:
+Whataboutism: 0.2 (comparison exists but not deflective)
+Ad Hominem: 0.8 (direct personal attack on character present)  
+Loaded Language: 0.9 (multiple emotionally charged terms)
+شما این scores را extract می‌کنید با regex یا با خواندن structured output. حالا شما برای هر technique سه چیز دارید:
+•	P_neural: احتمال از neural model
+•	P_kg: احتمال adjusted شده از knowledge graph reasoning
+•	S_llm: score از LLM reasoning (۰ تا ۱)
+Final Fusion چه چیزهایی را ترکیب می‌کند؟
+شما سه منبع evidence دارید که باید combine شوند:
+منبع ۱ - Neural Soft Predictions: مدل CLIP+RoBERTa شما برای هر ۲۲ technique یک probability می‌دهد. این probabilities را نرمالیز کنید که مجموعشان ۱ شود (یا برای multi-label، هر کدام بین ۰-۱ باشد). این بگوییم P_neural(t) برای technique t باشد.
+منبع ۲ - Knowledge Graph Adjusted Scores: شما P_neural را گرفتید، روی knowledge graph constraint satisfaction کردید و یک P_kg(t) جدید به دست آوردید. این scores تضمین می‌کنند که logical inconsistencies ندارید - مثلاً اگر Ethos=0.9 باشد اما همه children آن (Ad Hominem, Appeal to Authority) کمتر از ۰.۱ باشند، KG این را می‌بیند و یا Ethos را کاهش می‌دهد یا یکی از children را بالا می‌برد.
+منبع ۳ - LLM Verification Scores: برای هر technique، S_llm(t) که نشان می‌دهد LLM چقدر فکر می‌کند evidence کافی وجود دارد. این مبتنی بر explicit reasoning است - آیا تعریف technique با محتوای meme match می‌کند یا نه.
+حالا چطور ترکیب کنیم؟ چند strategy دارید:
+Strategy A - Weighted Average ساده:
+P_final(t) = α·P_neural(t) + β·P_kg(t) + γ·S_llm(t)
+که α+β+γ=1. شما این وزن‌ها را روی validation set tune می‌کنید. مثلاً ممکن است بهینه باشد α=0.4, β=0.3, γ=0.3.
+Strategy B - Confidence-weighted Fusion: Neural model یک confidence به شما می‌دهد - مثلاً entropy پیش‌بینی‌ها. اگر neural model خیلی confident است (entropy پایین)، وزن بیشتری بدهید. اگر uncertain است، بیشتر به LLM و KG تکیه کنید:
+w_neural = exp(-entropy(P_neural)) / Z
+P_final(t) = w_neural·P_neural(t) + w_kg·P_kg(t) + w_llm·S_llm(t)
+Strategy C - Veto-based Fusion (پیشنهاد من): این realistic تر است. LLM و KG در واقع veto power دارند - یعنی می‌توانند predictions غیرمنطقی را رد کنند:
+برای هر technique t:
+  اگر S_llm(t) < 0.2:  # LLM می‌گوید evidence کافی نیست
+    P_final(t) = 0.1 * P_neural(t)  # heavily penalize
+  اگر KG می‌گوید constraints violated هستند:
+    P_final(t) = 0  # hard veto
+  در غیر این صورت:
+    P_final(t) = 0.5·P_neural(t) + 0.3·P_kg(t) + 0.2·S_llm(t)
+این approach باعث می‌شود که predictions که منطقاً غیرممکن هستند یا evidence ندارند، حذف شوند حتی اگر neural model confident باشد.
+بعد چه می‌شود؟
+پس از fusion، شما P_final برای همه ۲۲ techniques دارید. حالا باید thresholding کنید:
+۱. Per-technique threshold optimization: روی validation set، برای هر technique یک threshold بهینه پیدا کنید که F1 را maximize کند. این thresholds را ذخیره کنید. برای rare techniques مثل Bandwagon، threshold پایین‌تر خواهد بود (مثلاً ۰.۱۵) چون می‌خواهید recall را بالا ببرید. برای frequent techniques مثل Smears، threshold بالاتر (مثلاً ۰.۴) چون precision مهم‌تر است.
+۲. Hierarchical consistency enforcement (دوباره): حتی بعد از fusion، یک final pass بزنید که بررسی کند hierarchy respected شده باشد. اگر می‌خواهید Ad Hominem را predict کنید، مطمئن شوید Ethos هم predicted شده. اگر نه، یا Ad Hominem را drop کنید یا Ethos را add کنید (بسته به confidence).
+۳. Output: final set of techniques.
+چرا این approach برای شما کار می‌کند؟
+با نگاه به results شما، مشکل اصلی این است که مدل neural شما risk-averse است. وقتی uncertain است، در hierarchy بالا می‌ماند (Ethos/Pathos/Logos) و پایین نمی‌رود. این به خاطر training dynamics است - چون fine-grained techniques کمیاب هستند، model یاد گرفته safe بازی کند.
+Knowledge graph و LLM reasoning این را حل می‌کنند چون:
+KG می‌گوید: "اگر تو Ethos=0.95 می‌گویی، پس باید حداقل یکی از {Ad Hominem, Appeal to Authority, Credibility} را قوی predict کنی. نمی‌توانی همه را ۰.۰۵ بگذاری." این مدل را مجبور می‌کند commitment بدهد.
+LLM می‌گوید: "من دارم explicit reasoning می‌کنم - متن دقیقاً این pattern را دارد که Ad Hominem است چون personal attack on character without addressing argument." این high-level semantic understanding را اضافه می‌کند که neural model ممکن است miss کرده باشد.
+با این architecture، prediction برای یک meme به این صورت می‌شود:
+•	Neural model: "احتمالاً Ethos (0.9), شاید Ad Hominem (0.3), شاید Appeal to Authority (0.2)"
+•	KG reasoning: "Ethos=0.9 اما children ضعیف؟ inconsistent. من Ad Hominem را boost می‌کنم به 0.6 چون highest child probability است"
+•	LLM: "بله، من personal attack می‌بینم و explicit evidence دارم پس S_llm(Ad Hominem)=0.85"
+•	Final fusion: Ad Hominem قوی می‌شود (0.65) و از threshold عبور می‌کند
+این باعث می‌شود fine-grained techniques مثل Bandwagon، Whataboutism، Doubt که الان recall خیلی پایین دارند، بهبود پیدا کنند چون سه مکانیزم مختلف evidence جمع می‌کنند.
+آیا این روشن شد چطور کار می‌کند؟ کدام قسمت نیاز به توضیح بیشتر دارد - KG constraint satisfaction یا LLM prompting strategy یا fusion mechanism؟
+ایده های جدید
+پیشبرد تشخیص پروپاگاندا در میم‌ها: یک پژوهش فنی جامع
+مسابقات اخیر نشان داده‌اند که طبقه‌بندی سلسله‌مراتبی چندوجهی (multimodal) تکنیک‌های پروپاگاندا در میم‌ها همچنان یک مرز چالش‌برانگیز باقی مانده است، به‌طوری که بهترین سیستم‌ها علی‌رغم به‌کارگیری مدل‌های پیچیده زبان-بینایی، تنها به دقت سلسله‌مراتبی (hierarchical precision) ۷۷.۶۶٪ در SemEval-2024 Task 4 دست یافته‌اند. این پژوهش بیش از ۱۴۰ مقاله از سال‌های ۲۰۲۰ تا ۲۰۲۵ را ترکیب می‌کند تا بهبودهای مشخصی را شناسایی کند: ترکیب یادگیری سلسله‌مراتبی مقابله‌ای (contrastive hierarchical learning) با مدل‌سازی وابستگی لیبل مبتنی بر گراف (graph-based label dependency modeling) می‌تواند ۸ تا ۱۲ درصد بهبود نسبت به مدل‌های پایه (baselines) ایجاد کند، در حالی که تولید کپشن (caption generation) شکاف‌های میان‌وجهی (modality gaps) را پر می‌کند که انکودرهای تصویر خالص در محتوای استعاری (metaphorical) از دست می‌دهند. امیدبخش‌ترین مسیر پیش رو شامل ادغام تکنیک‌هایی از حوزه‌های مجاور است - به‌ویژه پیش‌بینی گراف صحنه (scene graph prediction) از حوزه تشخیص گفتار نفرت‌پراکن (بهبود ۳ تا ۷ درصدی درک معنایی جزئی‌نگر)، ماسک‌گذاری لیبل (label masking) از طبقه‌بندی چند-لیبله (multi-label) (برای مدیریت حاشیه‌نویسی‌های ناقص)، و امبدینگ‌های هذلولی (hyperbolic embeddings) برای ساختارهای سلسله‌مراتبی (که به طور طبیعی روابط طبقه‌بندی (ta xonomy) را حفظ می‌کنند). این نوآوری‌ها بلافاصله قابل اجرا هستند: تیم‌ها می‌توانند BLIP-2 با Q-Former را برای fine-tuning کارآمد به کار گیرند، hard negative mining را برای تشخیص تکنیک‌های مشابه پیاده‌سازی کنند، و از یادگیری انتقالی (transfer learning) از مجموعه داده ۲۵٬۰۰۰+ جمله‌ای PTC بهره ببرند. این حوزه در یک نقطه عطف قرار دارد که در آن ترنسفورمرهای چندوجهی پایه و اساس را فراهم می‌کنند، اما جهش بعدی در عملکرد نیازمند مدل‌سازی صریح محدودیت‌های سلسله‌مراتبی از طریق توابع زیان (loss functions) تخصصی، شبکه‌های عصبی گراف (GNN) برای هم‌رخدادی (co-occurrence) تکنیک‌ها، و رویکردهای نورو-سیمبولیک (neuro-symbolic) است که سازگاری منطقی را در سراسر طبقه‌بندی پروپاگاندا اعمال می‌کنند.
+حوزه ۱: رویکردهای مستقیم برای تشخیص پروپاگاندا در میم‌ها
+تکامل تشخیص پروپاگاندا در میم‌ها با دو چالش مشترک (shared tasks) محوری به شدت تسریع شد و اکوسیستم غنی از رویکردها را ایجاد کرد که از الحاق (concatenation) ساده تا سیستم‌های استدلال چندوجهی پیچیده را در بر می‌گیرد.
+SemEval-2024 نماینده پیشرفته‌ترین سطح با محدودیت‌های سلسله‌مراتبی است
+مسابقه SemEval-2024 Task 4، ۱۵۳ تیم ثبت‌نام شده را در زمینه تشخیص چندزبانه ۲۲ تکنیک اقناعی که در یک گراف جهت‌دار غیرمدور (DAG) سازماندهی شده‌اند، جذب کرد. این ساختار سلسله‌مراتبی - با سطوحی از دسته‌بندی‌های گسترده مانند «اقناع» (Persuasion) تا تکنیک‌های خاص مانند «Whataboutism» - برای عملکرد حیاتی بود. سیستم‌های برنده به میانگین ۶۶.۷٪ macro-F1 در چهار زبان (انگلیسی، بلغاری، مقدونی شمالی، عربی) دست یافتند، اما مهم‌تر از آن، چندین تکنیک پیشگامانه را معرفی کردند.
+BERTastic به بالاترین دقت سلسله‌مراتبی (۷۷.۶۶٪) با استفاده از مدل‌های زبان-بینایی zero-shot با همجوشی اولیه (early fusion) دست یافت، که نشان می‌دهد پیش‌آموزش در مقیاس بزرگ بر روی جفت‌های تصویر-متن متنوع، تعمیم‌پذیری بین-زبانی را بدون fine-tuning خاص وظیفه امکان‌پذیر می‌سازد. این رویکرد به‌ویژه در داده‌های آزمون مقدونی شمالی برتری داشت، که نشان می‌دهد VLMهای آموزش‌دیده بر روی داده‌های در مقیاس وب، الگوهای جهانی پروپاگاندا را می‌آموزند که در بین زبان‌ها و زمینه‌های فرهنگی قابل انتقال هستند.
+تیم BCAmirs (در جمع ۳ تیم برتر همه زبان‌ها) یک نوآوری تحول‌آفرین را معرفی کرد: استفاده از GPT-4 Vision برای تولید کپشن‌های میانی قبل از طبقه‌بندی. این کار یک چالش اساسی را حل می‌کند - میم‌های پروپاگاندا اغلب از تصاویر استعاری یا انتزاعی استفاده می‌کنند که انکودرهای تصویر استاندارد را سردرگم می‌کند. معماری ConcatRoBERTa آن‌ها امبدینگ‌های متنی RoBERTa-large را با ویژگی‌های بصری CLIP فریز شده و کپشن‌های تولید شده توسط GPT-4 الحاق می‌کند و به h-F1 ۷۱.۱۱۵ در مجموعه توسعه (development set) دست یافت. مرحله تولید کپشن به طور موثر استعاره‌های بصری را به توصیفات متنی صریح ترجمه می‌کند و شکافی را که محققان «شکاف وجهی» (modality gap) می‌نامند، پر می‌کند.
+استفاده از ساختار سلسله‌مراتبی، برترین‌ها را از بقیه جدا می‌کند
+تجزیه و تحلیل ۳۲ مقاله توصیف سیستم نشان می‌دهد که مدل‌سازی صریح سلسله‌مراتبی به طور مداوم عملکرد را ۳ تا ۶ واحد درصد بهبود می‌بخشد. تیم IITK از دو رویکرد مکمل استفاده کرد: امبدینگ‌های هذلولی HypEmo به طور طبیعی طبقه‌بندی‌های سلسله‌مراتبی را در فضای خمیده نشان می‌دهند که در آن فواصل والد-فرزند منعکس‌کننده روابط معنایی است، در حالی که «پیش‌بینی تعریف کلاس» (Class Definition Prediction) استدلال مستقل از مجموعه داده را با استفاده از تعاریف تکنیک‌ها فراهم می‌کند. انسامبل (ensemble) آن‌ها به h-F1 ۶۷٪ در زیروظیفه چندوجهی دست یافت.
+رویکرد نورو-سیمبولیک تیم Pauk، مدل‌های DeBERTa و ResNet را با قوانین منطق مرتبه اول که به عنوان محدودیت‌های نرم (soft constraints) از طریق t-norms کدگذاری شده‌اند، ترکیب می‌کند. این تقطیر دانش (knowledge distillation) از معلم سیمبولیک به دانش‌آموز عصبی تضمین می‌کند که پیش‌بینی‌ها به سازگاری سلسله‌مراتبی احترام می‌گذارند - یک تکنیک فرزند نمی‌تواند احتمال بالاتری از والد خود داشته باشد. اگرچه این رویکرد در رتبه ۷ از ۱۴ در زیروظیفه 2a قرار گرفت، اما مزایای تفسیرپذیری (interpretability) را ارائه می‌دهد و از پیش‌بینی‌های منطقاً غیرممکن جلوگیری می‌کند.
+EURECOM توابع زیان سلسله‌مراتبی سفارشی طراحی کرد که کلاس‌های اجداد را در کنار گره‌های برگ (leaf nodes) خروجی می‌دهند و انسامبل‌های مخصوص تکنیک را پیاده‌سازی می‌کنند که در آن ترکیب بهینه مدل برای هر تکنیک پروپاگاندا متفاوت است. رویکرد آن‌ها به F1 ۰.۶۵۵ در زبان انگلیسی دست یافت اما اهمیت طراحی تابع زیان را نشان داد - کراس-انتروپی استاندارد برای عدم تعادل شدید کلاس و محدودیت‌های سلسله‌مراتبی ناکافی بود.
+SemEval-2021 رویکردهای چندوجهی بنیادی را پایه‌گذاری کرد
+وظیفه قبلی (SemEval-2021 Task 6) با ۶۸۷ میم آموزشی، بینش‌های اولیه حیاتی را فراهم کرد. تیم آلفا از HIT با ERNIE-ViL (نمایش پیشرفته از طریق یکپارچه‌سازی دانش) برنده شد، که یک ترنسفورمر دو-جریانی (two-stream) با توجه متقاطع (cross-attended) است که بر روی داده‌های تصویر-کپشن در مقیاس بزرگ با اهداف گراف صحنه پیش‌آموزش دیده است. نوآوری حیاتی آن‌ها استفاده از focal loss برای مدیریت عدم تعادل شدید کلاس بود که به micro-F1 ۰.۵۷۲ دست یافت - بهبودی ۸.۹ برابری نسبت به مدل پایه ۰.۰۶۴.
+تیم MinD از Alibaba DAMO (مقام دوم، F1 ۰.۵۴۹) در استخراج ویژگی‌های بصری ناهمگن (heterogeneous) پیشگام بود و ویژگی‌های تشخیص چهره (ResNet-34)، OCR با امبدینگ‌های موقعیتی، ویژگی‌های ناحیه‌ای Faster R-CNN و درک صحنه ResNet-50 را ترکیب کرد. این رویکرد چندوجهی تشخیص می‌دهد که میم‌های پروپاگاندا از کانال‌های بصری مختلفی بهره‌برداری می‌کنند: چهره‌ها برای جذابیت‌های احساسی، متن-در-تصویر برای پیام‌رسانی لایه‌لایه، اشیاء برای دستکاری نمادین، و ترکیب‌بندی کلی برای اثرات قاب‌بندی (framing). یادگیری انتقالی دو مرحله‌ای آن‌ها - ابتدا fine-tuning روی مجموعه داده خبری PTC (بیش از ۲۰٬۰۰۰ جمله) و سپس روی داده‌های میم - نشان داد که انتقال دامنه (domain transfer) از پروپاداندای متنی، تشخیص چندوجهی را بهبود می‌بخشد.
+تیم Volta نشان داد که انسامبل کردن مدل‌های تخصصی بر معماری‌های واحد برتری دارد و RoBERTa-LARGE را با ترنسفورمرهای چندوجهی (UNITER, VisualBERT, LXMERT) با الحاق امبدینگ‌های [CLS] ترکیب کرد. در کمال تعجب، تحلیل آن‌ها نشان داد که RoBERTa-LARGE به تنهایی عملکرد رقابتی داشت، که نشان می‌دهد بسیاری از میم‌ها همچنان به شدت متکی به متن هستند و ماژول‌های درک بصری هنوز فضای قابل توجهی برای بهبود دارند.
+تکامل از پایه‌ای به پیشرفته، انتخاب‌های طراحی حیاتی را آشکار می‌کند
+رویکردهای اولیه از الحاق ساده ویژگی‌های متنی BERT با ویژگی‌های تصویری ResNet قبل از طبقه‌بندی استفاده می‌کردند - استراتژی‌ای که به بهبودهای متوسطی دست یافت اما نتوانست تعاملات بین وجهی (cross-modal) را در طول آموزش مدل‌سازی کند. این پیشرفت سه مرحله متمایز را نشان می‌دهد:
+فاز ۱ (رویکردهای پایه): مدل‌های تک-جریانی (Single-stream) با الحاق زودهنگام ویژگی‌ها به micro-F1 حدود ۰.۴۵ تا ۰.۵۰ دست یافتند. این‌ها با مشکل مواجه بودند زیرا تشخیص پروپاگاندا نیازمند درک چگونگی تعامل معنایی متن و تصویر است - هم‌جواری، تناقض، تقویت - نه فقط استخراج ویژگی مستقل.
+فاز ۲ (ترنسفورمرهای چندوجهی پیش‌آموزش‌دیده): ERNIE-ViL، CLIP، UNITER و VisualBERT عملکرد را به ۰.۵۵-۰.۵۷ رساندند با یادگیری نمایش‌های مشترک از طریق وظایفی مانند مدل‌سازی چندوجهی ماسک‌دار و تطبیق تصویر-متن. بینش کلیدی: مکانیسم‌های توجه متقاطع (cross-modal attention) در طول پیش‌آموزش، مدل‌ها را قادر می‌سازد تا نحوه تعامل عناصر پروپاداندای بصری و متنی را بیاموزند.
+فاز ۳ (روش‌های سلسله‌مراتبی و انسامبل): معرفی لیبل‌های سلسله‌مراتبی در SemEval-2024 منجر به نوآوری در توابع زیان، امبدینگ‌های لیبل، و مدل‌سازی وابستگی مبتنی بر گراف شد و دقت سلسله‌مراتبی را به بالای ۰.۷۷ رساند. «تجمیع دوخطی فشرده» (Compact Bilinear Pooling) تیم LT3 به طور موثر ضرب‌های خارجی (outer products) با ابعاد بالا بین وجه‌ها را تقریب می‌زند و «امبدینگ‌های میم» (memebeddings) غنی ایجاد می‌کند که تعاملات پیچیده را بدون انفجار ابعادی ثبت می‌کند.
+استراتژی‌های همجوشی (Fusion) به طور حیاتی بر عملکرد تأثیر می‌گذارند
+مقایسه سیستماتیک بیش از ۴۰ سیستم، سلسله‌مراتب روشنی از اثربخشی همجوشی را نشان می‌دهد:
+همجوشی دیرهنگام (Late fusion) (مدل‌های وجهی مجزا، ترکیب پیش‌بینی‌ها) ماژولار بودن را فراهم می‌کند اما الگوهای تعامل را در طول آموزش از دست می‌دهد. MinD با جبران از طریق ویژگی‌های بصری ناهمگن و انسامبل‌های عظیم بیش از ۵ مدل زبانی پیش‌آموزش‌دیده، به نتایج قوی (F1 0.549) با همجوشی دیرهنگام دست یافت.
+همجوشی زودهنگام (Early fusion) (الحاق ویژگی‌ها قبل از طبقه‌بندی) امکان برخی تعاملات را فراهم می‌کند اما اغلب به مشارکت‌های افزایشی تقلیل می‌یابد. رویکردهای الحاق ساده به ندرت بدون مهندسی ویژگی گسترده از F1 ۰.۵۰ فراتر رفتند.
+مدل‌های پیش‌آموزش‌دیده مشترک (ERNIE-ViL، CLIP، UNITER) هم‌ترازی‌های بین‌وجهی را از طریق اهداف مقابله‌ای (contrastive) و مدل‌سازی ماسک‌دار می‌آموزند و به طور مداوم به F1 ۰.۵۵-۰.۵۷ دست می‌یابند. این‌ها چگونگی دستکاری پروپاگاندا در روابط بین وجه‌های بصری و متنی را ثبت می‌کنند.
+همجوشی مبتنی بر توجه با وزن‌های توجه بین‌وجهی آموخته‌شده، ادغام پویا و وابسته به زمینه را امکان‌پذیر می‌سازد. امبدینگ لیبل تیم 1213Li با توجه چندوجهی، هر تکنیک پروپاگاندا را به عنوان یک امبدینگ قابل یادگیری در نظر می‌گیرد که بر روی هر دو وجه توجه (attend) می‌کند و با مدل‌سازی صریح اینکه کدام ویژگی‌های بصری و متنی نشان‌دهنده هر تکنیک خاص هستند، به F1 ۰.۵۴۹ دست یافت.
+انتشارات اخیر فراتر از مسابقات SemEval گسترش می‌یابند
+ادبیات ۲۰۲۴-۲۰۲۵ چندین جهت جدید را معرفی می‌کند. مناظره چندوجهی بین مدل‌های زبانی بزرگ (Lin و همکاران، WWW 2024) به سوگیری (bias) در منطق‌های (rationales) تولید شده توسط LLM می‌پردازد، با وادار کردن چندین عامل LLM به مناظره در مورد طبقه‌بندی پروپاگاندا از طریق استدلال زنجیره‌ای-فکر (chain-of-thought)، که هم دقت و هم توضیح‌پذیری را در مجموعه داده HarMeme بهبود می‌بخشد.
+سیستم‌های LLM چند-عاملی برای زبان‌های کم‌منبع (Alam و همکاران، ۲۰۲۴) عملکرد قوی در پروپاداندای میم‌های عربی با استفاده از GPT-4 و Gemini بدون fine-tuning مخصوص زبان نشان می‌دهند. مجموعه داده ArAIEval تقاطع‌هایی بین پروپاگاندا و گفتار نفرت‌پراکن را آشکار می‌کند، به طوری که تکنیک‌های پروپاگاندا مانند «توسل به ترس» (Appeal to Fear) اغلب با محتوای نفرت‌پراکن هم‌رخداد هستند.
+استفاده زودهنگام تیم LIIR از CLIP (۲۰۲۱) آینده‌نگرانه بود - در حالی که در micro-F1 رتبه هشتم را کسب کردند، با مدیریت بهتر تکنیک‌های پروپاداندای نادر، به دومین macro-F1 برتر دست یافتند. طبقه‌بندهای زنجیره‌ای آن‌ها با افزایش داده (augmentation) ترجمه-معکوس (back-translation) نشان داد که پیش‌آموزش مقابله‌ای بر روی ۴۰۰ میلیون جفت تصویر-متن، نمایش‌هایی مقاوم در برابر عدم تعادل کلاس فراهم می‌کند.
+معیارهای عملکرد کمی، چالش‌های باقی‌مانده را آشکار می‌سازد
+نتایج SemEval-2024 Task 4 در زیروظایف مختلف، فضای قابل توجهی برای بهبود را نشان می‌دهد:
+زیروظیفه ۱ (فقط متن، ۲۰ تکنیک): بهترین h-F1 به ۶۰-۶۵٪ رسید، و مدل‌های زبانی انسامبل و افزایش داده پارافریز (تیم CLaC) از مدل‌های واحد بهتر عمل کردند. نرخ خطای ۳۵-۴۰٪ نشان‌دهنده دشواری اساسی در تشخیص پروپاداندای فقط-متنی است.
+زیروظیفه 2a (چندوجهی، ۲۲ تکنیک، سلسله‌مراتبی): سیستم‌های برتر (BERTastic، BCAmirs) به دقت سلسله‌مراتبی ۷۱-۷۷٪ دست یافتند اما تنها ۲۶-۲۹٪ macro-F1 بر روی تکنیک‌های نادر کسب کردند. این شکاف عظیم نشان می‌دهد که رویکردهای فعلی هنوز با تکنیک‌های پروپاداندای دنباله-دراز (long-tail) مانند «کلیشه پایان‌دهنده-فکر» (Thought-terminating Cliché) و «Whataboutism» که به ندرت در داده‌های آموزشی ظاهر می‌شوند، دست و پنجه نرم می‌کنند.
+زیروظیفه 2b (حضور/غیاب دودویی): بهترین macro-F1 بر اساس زبان به طور قابل توجهی متفاوت بود - ۷۹.۸۶٪ در انگلیسی اما تنها ۵۵.۵۴٪ در عربی - که نشان می‌دهد انتقال بین-زبانی علی‌رغم پیش‌آموزش چندزبانه همچنان چالش‌برانگیز است.
+اثر سقفی (ceiling effect) نشان می‌دهد که پیشروی فراتر از دقت ۸۰٪ نیازمند نوآوری‌هایی فراتر از مقیاس‌بندی معماری‌های موجود است. به طور خاص: مدیریت بهتر محتوای استعاری، درک بهبودیافته از زمینه فرهنگی، و تکنیک‌هایی برای یادگیری چند-شات (few-shot) انواع پروپاداندای نادر.
+حوزه ۲: تکنیک‌های قابل انتقال از مسائل چندوجهی مجاور
+چالش‌های طبقه‌بندی مرتبط به طور مستقل تکنیک‌های قدرتمندی را توسعه داده‌اند که مستقیماً به مشکلات اصلی تشخیص پروپاگاندا می‌پردازند - هم‌ترازی معنایی جزئی‌نگر، وابستگی‌های لیبل، ساختارهای سلسله‌مراتبی، و استدلال چندوجهی.
+مدل‌های زبان-بینایی، معماری‌های بنیادی با بده‌بستان‌های (trade-offs) متمایز ارائه می‌دهند
+یادگیری مقابله‌ای (contrastive learning) در CLIP بر روی ۴۰۰ میلیون جفت تصویر-متن، شباهت کسینوسی را برای جفت‌های صحیح حداکثر می‌کند در حالی که شباهت را در N²-N جفت نادرست در بچ‌های بزرگ (۳۲٬۷۶۸) به حداقل می‌رساند. این کار فضاهای امبدینگ هم‌تراز ایجاد می‌کند که در آن عناصر بصری پروپاگاندا (پرچم‌ها، تصاویر تهدیدآمیز، چهره‌های مقتدر) در نزدیکی توصیفات متنی خود خوشه‌بندی می‌شوند. CLIP به دقت ۷۶.۲٪ zero-shot در ImageNet دست می‌یابد که با ResNet-50 نظارت‌شده رقابت می‌کند و با بهبود ۱۵-۲۰٪ نسبت به مدل‌های پایه فقط-بینایی به تشخیص پروپاگاندا منتقل می‌شود. قابلیت zero-shot امکان تشخیص تکنیک‌های نوظهور پروپاگاندا را بدون نمونه‌های برچسب‌دار فراهم می‌کند.
+Q-Former (ترنسفورمر پرسشگر) در BLIP-2 انطباق کارآمد از نظر پارامتر (parameter-efficient) را با قرار دادن یک پل سبک (۳۲ توکن پرس‌وجوی قابل یادگیری) بین انکودرهای تصویر فریز شده و LLMها ارائه می‌دهد. این با ۵۴ برابر پارامترهای قابل آموزش کمتر نسبت به Flamingo به ۶۵.۰٪ zero-shot VQAv2 دست می‌یابد. برای تشخیص پروپاگاندا، Q-Former مرتبط‌ترین ویژگی‌های بصری را از طریق توجه متقاطع (cross-attention) بدون fine-tuning گران‌قیمت کل مدل استخراج می‌کند - که وقتی داده‌های پروپاداندای برچسب‌دار کمیاب هستند، حیاتی است. آموزش فقط به ۶ ساعت روی ۸ پردازنده گرافیکی A100 در مقایسه با هفته‌ها برای پیش‌آموزش کامل نیاز دارد.
+تنظیم دستورالعمل بصری (visual instruction tuning) در LLaVA، مدل CLIP ViT-L/14 را از طریق یک پروجکشن MLP ساده به Vicuna LLM متصل می‌کند و بر روی ۱۵۸ هزار نمونه پیروی-از-دستورالعمل تولید شده توسط GPT-4 آموزش دیده است. این تحلیل محاوره‌ای از پروپاگاندا را امکان‌پذیر می‌سازد - پرسیدن «چه تکنیک‌های دستکاری احساسی در این میم ظاهر می‌شوند؟» و دریافت توضیحات دقیق به زبان طبیعی. LLaVA در وظایف محاوره‌ای ۲۹٪ بهتر از BLIP-2 عمل می‌کند و به ۸۱.۷٪ در سوالات استدلال پیچیده دست می‌یابد، که مستقیماً برای توضیح مکانیسم‌های پروپاگاندا قابل استفاده است.
+ترنسفورمر چندمسیره (Multiway Transformer) در BEiT-3 با تصاویر به عنوان «زبان خارجی» با خود-توجهی (self-attention) مشترک (۳۱۷ میلیون پارامتر) اما متخصصان feed-forward مخصوص وجه (۶۹۲ میلیون بینایی، ۶۹۲ میلیون زبان) رفتار می‌کند. این معماری یکپارچه وظایف متنی، تصویری و چندوجهی را در یک مدل واحد مدیریت می‌کند و به ۸۴.۲٪ VQAv2 و 63.7 COCO object detection AP دست می‌یابد. برای پروپاگاندا، متخصص بینایی عناصر بصری نمادین را تشخیص می‌دهد در حالی که متخصص زبان آرایه‌های بلاغی را پردازش می‌کند و توجه مشترک آن‌ها را هم‌تراز می‌کند.
+مکانیسم‌های توجه متقاطع (Cross-modal attention) هم‌ترازی معنایی جزئی‌نگر را امکان‌پذیر می‌سازند
+ViLT (ترنسفورمر بینایی-و-زبان) معماری را با پردازش مستقیم پچ‌های تصویر و توکن‌های متن از طریق یک ترنسفورمر واحد بدون ویژگی‌های ناحیه‌ای یا تشخیص شی، ساده می‌کند. این به ۱۰ تا ۳۰ برابر آموزش سریع‌تر نسبت به پیشینیان خود (۳ روز روی ۸ پردازنده V100) دست می‌یابد در حالی که دقت رقابتی (۷۱.۳٪ VQAv2) را حفظ می‌کند. برای نظارت لحظه‌ای بر پروپاگاندا در رسانه‌های اجتماعی، کارایی ViLT امکان پردازش هزاران میم در ثانیه را فراهم می‌کند.
+توجه متقاطع دو-جریانی (dual-stream) در LXMERT، انکودینگ روابط اشیاء (۵ لایه)، انکودینگ زبان (۹ لایه) و انکودینگ صریح بین‌وجهی (۵ لایه) را جدا می‌کند. لایه‌های بین‌وجهی توجه دوطرفه را پیاده‌سازی می‌کنند - ویژگی‌های تصویر به متن توجه می‌کنند، متن به تصاویر توجه می‌کند - و چگونگی قاب‌بندی متن پروپاگاندا برای محتوای بصری را ثبت می‌کنند. LXMERT با دستیابی به ۷۲.۴٪ VQAv2 و 60.0% GQA، در استدلال در مورد روابط برتری دارد، که برای تشخیص دستکاری‌های رابطه‌ای پروپاگاندا (مانند هم‌جواری رویدادهای نامرتبط برای القای علیت) حیاتی است.
+ترنسفورمر گلوگاه چندوجهی (Multimodal Bottleneck Transformer) جریان اطلاعات بین‌وجهی را از طریق ۴ تا ۱۶ واحد همجوشی پنهان (latent fusion units) محدود می‌کند و مدل را مجبور می‌سازد تنها مرتبط‌ترین ویژگی‌های پروپاگاندا را استخراج کند. این FLOPs را تا ۵۰٪ کاهش می‌دهد در حالی که عملکرد را حفظ می‌کند، از بیش‌برازش (overfitting) به همبستگی‌های جعلی (مانند هم‌رخدادی پس‌زمینه‌های خاص تصویر با تکنیک‌ها) جلوگیری می‌کند و امکان پیاده‌سازی بر روی دستگاه‌های با منابع محدود را فراهم می‌سازد. این گلوگاه به عنوان یک تنظیم‌کننده (regularizer) مبتنی بر نظریه اطلاعات عمل می‌کند.
+یادگیری مقابله‌ای با نگاتیوهای سخت (hard negatives)، تمایزات جزئی‌نگر را دقیق‌تر می‌کند
+کاوش نگاتیو سخت (Hard negative mining)، نگاتیوها را متناسب با (sim(x, x⁻)^β نمونه‌برداری می‌کند که در آن β سختی را کنترل می‌کند - β=0 نمونه‌برداری یکنواخت می‌دهد، β→∞ سخت‌ترین نگاتیوها را انتخاب می‌کند. با استفاده از loss مقابله‌ای بدون سوگیری (debiased contrastive loss)، این ارزیابی خطی ImageNet را از ۷۱.۷٪ به ۷۳.۷٪ بهبود می‌بخشد. برای پروپاگاندا، نگاتیوهای سخت، میم‌هایی هستند که از تکنیک‌های مشابه اما متمایز استفاده می‌کنند (مانند «توسل به ترس» در مقابل «توسل به اقتدار») - هر دو تصاویر تهدیدآمیز نشان می‌دهند اما در منبع قاب‌بندی متفاوت هستند. کاوش، مدل‌ها را مجبور به یادگیری تمایزات ظریف می‌کند.
+نگاتیوهای سخت ترکیبی (Compositional hard negatives) (Zhang و همکاران، ۲۰۲۴) عملیات SWAP، REPLACE و ADD را بر روی کپشن‌ها اعمال می‌کنند، سپس از طریق امبدینگ‌های انحراف (deviation embeddings) به دامنه بصری ترجمه می‌کنند: neg_img_features = pos_img_features + (embed(neg_cap) - embed(pos_cap)). این به شکنندگی ترکیبی CLIP رسیدگی می‌کند و بنچمارک VALSE را ۳.۴٪ و درک روابط را به طور قابل توجهی بهبود می‌بخشد. پروپاگاندا اغلب شامل دستکاری‌های ترکیبی است - جابجایی فاعل/مفعول در روابط ضمنی، افزودن زمینه نادرست - که این را مستقیماً قابل اجرا می‌سازد.
+یادگیری مقابله‌ای زبان-بینایی در مقیاس (EVA-CLIP، NegCLIP) با فیلتر کردن نگاتیو سخت به ۸۹.۶٪ zero-shot ImageNet و ۷۱.۶٪ در استدلال ترکیبی VALSE (۴٪+ نسبت به CLIP) دست می‌یابد. بینش: اندازه‌های بچ بزرگ، نگاتیوهای درون-بچ (in-batch) متنوعی را فراهم می‌کنند، اما افزودن نگاتیوهای سخت از بازیابی‌های نادرست برتر، امکان تمایز بین تکنیک‌های پروپاداندای معنایی مشابه اما متمایز را فراهم می‌کند.
+Fine-tuning کارآمد از نظر پارامتر، انطباق سریع دامنه را امکان‌پذیر می‌سازد
+LoRA (انطباق رتبه-پایین) ماتریس‌های تجزیه رتبه (rank decomposition) قابل یادگیری را به وزن‌های مدل فریز شده تزریق می‌کند: W_final = W₀ + BA که در آن A ∈ ℝʳˣᵏ, B ∈ ℝᵈˣʳ با رتبه r معمولاً ۴-۶۴ است. این پارامترهای قابل یادگیری را به ۰.۱٪ کل مدل کاهش می‌دهد در حالی که عملکرد رقابتی را حفظ می‌کند. برای تشخیص پروپاگاندا با ۱۰ هزار میم برچسب‌دار، LoRA امکان fine-tuning مدل‌های در مقیاس GPT-3 را بر روی یک GPU واحد در عرض چند ساعت به جای چند روز روی یک خوشه فراهم می‌کند.
+لایه‌های آداپتور (لایه‌های گلوگاه کوچک که بین بلوک‌های ترنسفورمر قرار می‌گیرند) به کارایی مشابهی دست می‌یابند، به طوری که آداپتورهای ترنسفورمر بینایی دقت ۶۵.۰۸٪ را تنها با استفاده از ۱.۲۴ میلیون پارامتر قابل یادگیری در مقایسه با ۸۷.۹ میلیون برای fine-tuning کامل حفظ می‌کنند. چندین آداپتور می‌توانند ترکیب شوند - یکی برای درک عمومی میم، دیگری برای ویژگی‌های خاص پروپاگاندا، سومی برای زمینه فرهنگی - که طراحی سیستم ماژولار را امکان‌پذیر می‌سازد.
+نوآوری‌های طبقه‌بندی سلسله‌مراتبی به محدودیت‌های طبقه‌بندی (taxonomy) رسیدگی می‌کنند
+Loss انتقال سلسله‌مراتب لیبل (LHT) ماتریس‌های انتقال صریح (P(child|parent را با یک loss سردرگمی (confusion loss) که خطاهای ناقض سلسله‌مراتب را جریمه می‌کند، مدل‌سازی می‌کند: L = L_cls + λ·Σ d_hierarchy(i,j)·P(y_i|x)·1[y=j]. در CUB-200 birds، این دقت را از ۸۴.۷٪ به ۸۸.۱٪ (۳.۴٪+) بهبود می‌بخشد. برای پروپاگاندا، این تضمین می‌کند که مدل یاد می‌گیرد که پیش‌بینی «Whataboutism» (جزئی‌نگر) نیازمند پیش‌بینی والد آن «Distraction» (کلی) است، و خطاها متناسب با فاصله در طبقه‌بندی جریمه می‌شوند.
+یادگیری مقابله‌ای چند-لیبله سلسله‌مراتبی (HiMulCon) جریمه‌های مقابله‌ای وزن‌دار-فاصله (distance-weighted) و پیشگیری از نقض سلسله‌مراتب را پیاده‌سازی می‌کند: ||h_child - h_parent||₂ ≤ margin. در ImageNet-22K، این ۲.۲٪+ نسبت به یادگیری مقابله‌ای استاندارد و ۲.۶٪+ mAP در iNaturalist به دست می‌آورد. این نوآوری، تکنیک‌های مرتبط سلسله‌مراتبی را در فضای ویژگی به هم نزدیک می‌کند در حالی که تکنیک‌های نامرتبط را جدا می‌کند، و امکان تشخیص zero-shot را از طریق شباهت به امبدینگ‌های تکنیک شناخته‌شده فراهم می‌سازد.
+طبقه‌بندی سلسله‌مراتبی احتمال شرطی (P(child|parent, x را به طور جداگانه برای هر والد مدل‌سازی می‌کند، سپس از طریق قاعده زنجیره‌ای ترکیب می‌کند: P(child|x) = P(child|parent,x)·P(parent|x). در ChestX-ray14، این به AUC ۰.۸۷۰ در مقابل ۰.۸۳۲ (۳.۸٪+) دست می‌یابد و به طور حیاتی عملکرد را با ۳۰٪ لیبل‌های ناقص حفظ می‌کند. برای مجموعه‌داده‌های پروپاگاندا که در آن حاشیه‌نویسی‌های جزئی‌نگر گران هستند، این امکان یادگیری از داده‌های تا حدی برچسب‌خورده را فراهم می‌کند - دانستن اینکه یک میم از جذابیت احساسی استفاده می‌کند بدون مشخص کردن اینکه کدام احساس خاص.
+شبکه‌های عصبی گراف، وابستگی‌های لیبل و هم‌رخدادی را مدل‌سازی می‌کنند
+شبکه‌های کانولوشن گراف چند-لیبله (ML-GCN) گراف‌های لیبل را از آمار هم‌رخدادی و امبدینگ‌های معنایی می‌سازند: A_ij = α·PMI(i,j) + (1-α)·cos_sim(embed_i, embed_j). C-GCN طبقه‌بندهای وابسته به هم را از طریق کانولوشن‌های گراف یاد می‌گیرد، در حالی که P-GCN پیش‌بینی‌ها را با استفاده از همبستگی‌های لیبل پالایش می‌کند. در MS-COCO، این mAP را از ۷۷.۳٪ به ۸۳.۷٪ (۸.۳٪+) بهبود می‌بخشد، با ۱۰-۱۲٪+ در کلاس‌های دنباله (tail classes). برای پروپاگاندا، گراف لیبل ثبت می‌کند که «زبان باردار» (Loaded Language) اغلب با «فراخوانی نام» (Name Calling) و «برچسب‌زنی» (Labeling) هم‌رخداد است، و مدل را قادر می‌سازد تا ترکیب‌های محتمل را پیش‌بینی کند.
+شبکه‌های عصبی هایپرگراف (Hypergraph) فراتر از روابط دوتایی به هایپراِج‌های (hyperedges) k-way که خوشه‌های تکنیک را نشان می‌دهند، گسترش می‌یابند. وزن‌های هایپراِج مخصوص نمونه (w_e = softmax(text_features·edge_e)) خوشه‌های مرتبط را به صورت پویا فعال می‌کنند. این به F1 ۴-۶٪+ نسبت به GCN استاندارد با پیچیدگی کمتر O(|E|·k) در مقابل O(|V|²) دست می‌یابد. ترکیب‌های رایج پروپاگاندا مانند {Loaded Language, Name Calling, Labeling} هایپراِج‌های طبیعی را تشکیل می‌دهند.
+شبکه‌های وابستگی عمیق (Deep Dependency Networks) (P(y_i|x, y_{-i} را با نمونه‌برداری گیبز (Gibbs sampling) برای استنتاج مدل‌سازی می‌کنند و به mAP ۲.۲٪+ نسبت به مدل‌های پایه RNN در MS-COCO و ۵.۴٪+ در Charades video دست می‌یابند. چارچوب احتمالی، کمی‌سازی عدم قطعیت (uncertainty quantification) را فراهم می‌کند - که وقتی تشخیص پروپاگاندا به تصمیمات تعدیل محتوا (moderation) اطلاع می‌دهد، حیاتی است. به جای خروجی دادن لیبل‌های قطعی، مدل اطمینان خود را در مورد حضور تکنیک به شرط تکنیک‌های شناسایی‌شده دیگر بیان می‌کند.
+معماری‌های طبقه‌بندی چند-لیبله به ترکیب تکنیک‌ها رسیدگی می‌کنند
+C-Tran (ترنسفورمر طبقه‌بندی) پیش‌بینی لیبل ماسک‌دار را با انکودینگ سه‌تایی (مثبت/منفی/ناشناخته) معرفی می‌کند و مستقیماً با لیبل‌های جزئی (partial labels) کار می‌کند. در COCO-80، این به ۸۳.۴٪ mAP (همه لیبل‌ها) و ۹۴.۳٪ (top-3) دست می‌یابد. هدف آموزش ماسک‌گذاری لیبل به طور تصادفی برخی لیبل‌ها را ماسک می‌کند و آن‌ها را از ویژگی‌های تصویر و لیبل‌های شناخته‌شده پیش‌بینی می‌کند و وابستگی‌های لیبل را به طور طبیعی می‌آموزد. برای پروپاگاندا با حاشیه‌نویسی‌های ناقص، C-Tran دقت را حفظ می‌کند در حالی که هزینه‌های حاشیه‌نویسی را کاهش می‌دهد.
+ترنسفورمر دو-جریانی (TSFormer) ویژگی‌های فضایی (سطح پچ) و ویژگی‌های معنایی (معناشناسی لیبل) را به موازات پردازش می‌کند، و توجه متقاطع چند-شات (multi-shot) به تدریج شکاف معنایی را کاهش می‌دهد. پالایش لایه به لایه، ویژگی‌های بصری خاص لیبل را که به طور فزاینده‌ای جزئی‌نگر هستند، کشف می‌کند. TSFormer با دستیابی به SOTA (بهترین در نوع خود) در Pascal VOC، MS-COCO و NUS-WIDE، پالایش تدریجی‌اش آینه تحلیل پروپاگاندا است - ابتدا شناسایی دستکاری عاطفی گسترده، سپس جذابیت‌های ترس خاص، و در نهایت تشخیص نشانه‌های بصری ترس.
+ماژول افزایش و سرکوب ویژگی در FL-Tran سرکوب مرحله‌ای ویژگی‌های برجسته (salient) را برای کشف ویژگی‌های پنهان پیاده‌سازی می‌کند. پس از تشخیص عناصر آشکار پروپاگاندا (پوشش‌های متنی بزرگ، نمادهای برجسته)، سرکوب این‌ها نشانه‌های ظریف (ریزحالت‌های چهره، روانشناسی رنگ، تعادل ترکیبی) را آشکار می‌سازد. این معماری چند مرحله‌ای با یافتن مداوم ویژگی‌های کلاس-اقلیت، از SOTA در COCO 2014 و VOC 2007 بهتر عمل می‌کند.
+تشخیص میم‌های نفرت‌پراکن، نوآوری‌های مستقیماً قابل انتقال را فراهم می‌کند
+چالش میم‌های نفرت‌پراکن (۱۰٬۰۰۰ میم) با استفاده از «عوامل گیج‌کننده خوش‌خیم» (benign confounders) طراحی شده است - نمونه‌هایی که در آن متن به تنهایی نفرت‌پراکن به نظر می‌رسد اما تصویر معنا را معکوس می‌کند، یا برعکس - که استدلال چندوجهی واقعی را ضروری می‌سازد. راه‌حل‌های برتر (AUC 0.79-0.84) VILLA، UNITER، ERNIE-ViL را با ۵ تا ۱۰ مدل انسامبل کردند که هر کدام به جنبه‌های مختلفی می‌پرداختند. اصل طراحی عامل گیج‌کننده خوش‌خیم مستقیماً برای مجموعه‌داده‌های پروپاگاندا قابل اعمال است: شامل میم‌هایی که در آن متن یک تکنیک را پیشنهاد می‌کند اما تصاویر تکنیک دیگری را نشان می‌دهند.
+پیش‌بینی گراف صحنه در ERNIE-ViL (وظایف پیش‌بینی شی، ویژگی، رابطه) در طول پیش‌آموزش، درک معنایی جزئی‌نگر را امکان‌پذیر می‌سازد. در VCR (استدلال عقل سلیم بصری)، این ۳.۷٪+ بهبود می‌یابد. میم‌های پروپاگاندا از الگوهای خاص شی-ویژگی-رابطه استفاده می‌کنند: چهره‌های مقتدر (اشیاء) در محیط‌های رسمی (ویژگی‌ها) که بالاتر از دیگران قرار گرفته‌اند (روابط)، «توسل به اقتدار» را منتقل می‌کند. گراف‌های صحنه این الگوها را صریح می‌کنند.
+آموزش تخاصمی (adversarial training) در VILLA، اغتشاشاتی (perturbations) را به امبدینگ‌ها در طول پیش‌آموزش اضافه می‌کند و مقاومت (robustness) را در برابر تلاش‌های پروپاداندای تخاصمی برای فرار از تشخیص بهبود می‌بخشد. پروپاگانداچی‌ها دائماً خود را با سیستم‌های تشخیص وفق می‌دهند؛ آموزش تخاصمی مدل‌هایی ایجاد می‌کند که فریب دادن آن‌ها سخت‌تر است. VILLA به طور گسترده در راه‌حل‌های برنده چالش میم‌های نفرت‌پراکن استفاده شد.
+تشخیص اطلاعات نادرست (Misinformation) تکنیک‌های سازگاری بین‌وجهی را ارائه می‌دهد
+MCOT (یادگیری مقابله‌ای چندوجهی با انتقال بهینه)، lossهای مقابله‌ای را با فاصله انتقال بهینه (optimal transport distance) برای هم‌ترازی بین‌وجهی ترکیب می‌کند. انتقال بهینه، تبدیل کم‌هزینه را برای هم‌ترازی توزیع‌های متن و تصویر پیدا می‌کند و جفت‌های دستکاری‌شده را تشخیص می‌دهد. در مجموعه‌داده‌های Weibo و PHEME، MCOT تعمیم‌پذیری قوی خارج-از-توزیع (out-of-distribution) را نشان می‌دهد - که برای پروپاداندایی که به سرعت در حال تحول است، حیاتی است.
+SAMPLE (یادگیری پرامپت چندوجهی آگاه-از-شباهت) پرامپت‌های گسسته، پیوسته و ترکیبی را با همجوشی آگاه-از-شباهت پیاده‌سازی می‌کند. SAMPLE با استفاده از RoBERTa (متن) + CLIP (بینایی + شباهت معنایی)، یادگیری چند-شات کارآمد تکنیک‌های جدید پروپاگاندا را امکان‌پذیر می‌سازد. پارادایم یادگیری پرامپت (prompt learning) تنها به ۱۶ تا ۳۲ نمونه برای انطباق مدل‌های پیش‌آموزش‌دیده با انواع نوظهور پروپاگاندا نیاز دارد.
+ادغام نورو-سیمبولیک LogicDM، محمول‌های منطقی (predicates) (۵ متا-محمول برای همبستگی‌های مختلف) را با استفاده از نمایش‌های عصبی پارامتری‌سازی می‌کند و به تفسیرپذیری با عملکرد قوی در مجموعه‌داده‌های توییتر، ویبو و کنایه (sarcasm) دست می‌یابد. برای پروپاگاندا، قوانین منطقی دانش دامنه را کدگذاری می‌کنند: اگر Appeal_to_Fear و Flag-waving آنگاه احتمالاً پروپاداندای ناسیونالیستی. مؤلفه عصبی نمونه‌های نرم (soft instantiations) را یاد می‌گیرد، در حالی که استدلال سیمبولیک توضیحات را ارائه می‌دهد.
+ماژول‌های تشخیص دستکاری (از MCNN، ۲۰۲۰) به صراحت دستکاری بصری را شناسایی می‌کنند - نواحی شبیه‌سازی‌شده (cloned)، آثار اتصال (splicing)، ردپاهای بهبود (enhancement). در حالی که پروپاگاندا ممکن است از تصاویر معتبر استفاده کند، تشخیص دستکاری به شناسایی «شواهد» ساختگی که از ادعاهای نادرست پشتیبانی می‌کنند، کمک می‌کند. این بررسی سازگاری چندوجهی (آیا محتوای بصری با ادعاهای متنی مطابقت دارد؟) مستقیماً به عدم هم‌ترازی مکرر تصویر-متن در پروپاگاندا اعمال می‌شود.
+یادگیری پرامپت (Prompt learning) انطباق کارآمد با لیبل‌های محدود را امکان‌پذیر می‌سازد
+CoOp (بهینه‌سازی زمینه) به جای پرامپت‌های متنی دست‌ساز، بردارهای پرامپت پیوسته را یاد می‌گیرد و به میانگین بهبود ۱۵٪+ تنها با ۱۶ شات نسبت به پرامپت‌های دستی دست می‌یابد. برای پروپاگاندا با نمونه‌های برچسب‌دار محدود از تکنیک‌های نادر، یادگیری پرامپت عملکرد رقابتی را امکان‌پذیر می‌سازد: پرامپت‌های قابل یادگیری «[V1][V2][V3][V4] نشان‌دهنده تکنیک پروپاداندای کلاس [CLASS] است» که در آن [V1]-[V4] بردارهای بهینه‌شده هستند.
+PromptKD (تقطیر دانش) از ویژگی‌های متنی معلم (teacher) استفاده مجدد می‌کند و آن را در پرامپت مدل دانش‌آموز (student) تقطیر می‌کند، که بهبودهای قابل توجهی در ImageNet zero-shot نشان می‌دهد. این امکان انتقال دانش تشخیص پروپاگاندا را از مدل‌های بزرگ (GPT-4V) به مدل‌های پیاده‌سازی کارآمد (CLIP-B/16) با تقطیر درک معلم در پرامپت‌های بهینه‌شده فراهم می‌کند.
+یادگیری پرامپت هدایت‌شده-گروهی (GGPL) دانش گروهی را از طریق LLMها از طریق یک ماژول هم‌ترازی دانش گروهی ادغام می‌کند و بهبودهایی را در ۱۱ مجموعه داده نشان می‌دهد. برای پروپاگاندا، گروه‌ها می‌توانند خانواده‌های تکنیک پروپاگاندا، خوشه جذابیت‌های احساسی، یا خوشه سفسطه‌های منطقی باشند. LLMها گروه‌بندی‌های معنایی را فراهم می‌کنند، که GGPL آن‌ها را در پرامپت‌های قابل یادگیری کدگذاری می‌کند.
+ترکیب رویکردها برای ارائه توصیه‌های عملی
+همگرایی شواهد در بیش از ۱۴۰ مقاله به انتخاب‌های معماری و استراتژی‌های آموزشی خاصی اشاره می‌کند که عملکرد تشخیص پروپاگاندا را به حداکثر می‌رسانند در حالی که کارایی و تفسیرپذیری را حفظ می‌کنند.
+معماری بهینه، نوآوری‌های مکمل را ترکیب می‌کند
+یک سیستم سلسله‌مراتبی سه مرحله‌ای بهترین بده‌بستان عملکرد-کارایی را ارائه می‌دهد: مرحله ۱ یک طبقه‌بند دودویی سریع (ViLT یا CLIP کوچک) را برای غربالگری پروپاگاندا با تأخیر ۱۰ میلی‌ثانیه مستقر می‌کند و ۶۰-۷۰٪ محتوای غیرپروپاگاندا را رد می‌کند. مرحله ۲ از BLIP-2 با Q-Former برای طبقه‌بندی کلی (احساسی، منطقی، مبتنی بر اعتبار) استفاده می‌کند و ویژگی‌های بصری مرتبط را از طریق ۳۲ پرس‌وجوی قابل یادگیری استخراج می‌کند. مرحله ۳ از یک ترنسفورمر چند-سر (multi-head) با پالایش شبکه عصبی گراف برای طبقه‌بندی تکنیک جزئی‌نگر استفاده می‌کند و فقط میم‌های پروپاداندای تایید شده را پردازش می‌کند.
+تولید کپشن از طریق GPT-4V قبل از طبقه‌بندی اولیه به شکاف وجهی در میم‌های استعاری رسیدگی می‌کند. BCAmirs بهبودهای ۴-۵٪ را از این مرحله میانی نشان داد - به ویژه ارزشمند است زیرا پروپاگاندا مکرراً از تصاویر نمادین استفاده می‌کند ( «دولت پنهان» که با چهره‌های سایه‌دار نشان داده می‌شود، تهدیدهای اقتصادی که به صورت اژدها نشان داده می‌شوند) که انکودرهای تصویر استاندارد را سردرگم می‌کند. کپشن‌های تولید شده استعاره‌های بصری را به توصیفات صریح ترجمه می‌کنند.
+طبقه‌بندی چند-سر با یادگیری برنامه‌درسی (curriculum learning) انکودرهای مشترک را با سرهای (heads) مخصوص وظیفه برای هر سطح سلسله‌مراتب آموزش می‌دهد. آموزش اولیه بر طبقه‌بندی کلی تأکید دارد (α=0.5 برای L_coarse، β=0.2 برای L_fine)، و به تدریج تمرکز را به تکنیک‌های جزئی‌نگر منتقل می‌کند (α=0.2، β=0.4 تا ایپاک ۶۰). این فرآیند یادگیری انسان را تقلید می‌کند - ابتدا درک دسته‌بندی‌های گسترده پروپاگاندا، سپس تمایز تکنیک‌های خاص - و به ۲.۳٪+ بهبود نسبت به آموزش مشترک در ImageNet سلسله‌مراتبی دست می‌یابد.
+توابع زیان باید سازگاری سلسله‌مراتبی را اعمال کنند
+ترکیب LHT loss (ماتریس‌های انتقال صریح) با HiMulCon (یادگیری مقابله‌ای با وزن‌دهی سلسله‌مراتبی) و تنظیم‌سازی سازگاری (consistency regularization) (جریمه کردن P(child) > P(parent)) مزایای مکملی را فراهم می‌کند که در مجموع ۸ تا ۱۲ درصد بهبود ایجاد می‌کند. فرمول کامل loss:
+L_total = L_binary + α·L_coarse + β·L_fine + γ·L_LHT + δ·L_HiMulCon + ε·L_consistency
+Focal loss برای عدم تعادل کلاس، هم در SemEval-2021 (تیم آلفا) و هم در بنچمارک‌های طبقه‌بندی سلسله‌مراتبی، ضروری بود. فرمول استاندارد FL = -(1-p)^γ log(p) با γ=2 نمونه‌های آسان را کم‌اهمیت می‌کند و یادگیری را بر موارد سخت متمرکز می‌کند. برای پروپاگاندا، تکنیک‌های نادر مانند «کلیشه پایان‌دهنده-فکر» (که در کمتر از ۲٪ داده‌های آموزشی ظاهر می‌شوند) نیازمند focal loss هستند تا از نادیده گرفتن آن‌ها توسط مدل‌ها جلوگیری شود.
+کراس-انتروپی وزن‌دار با زمان‌بندی پویا با تأکید بر دسته‌بندی‌های کلی شروع می‌شود و به تدریج وزن‌های جزئی‌نگر را افزایش می‌دهد: w_l^(dynamic) = w_l^0·(1 + β·epoch/max_epochs). این از بیش‌برازش زودهنگام به لیبل‌های جزئی‌نگر نویزی در حالی که نمایش‌های کلی هنوز در حال توسعه هستند، جلوگیری می‌کند.
+شبکه‌های عصبی گراف، روابط بین تکنیک‌ها را ثبت می‌کنند
+ساخت گراف لیبل از آمار هم‌رخدادی (PMI) و امبدینگ‌های معنایی (امبدینگ‌های BERT از تعاریف تکنیک) یال‌هایی (edges) ایجاد می‌کند که وزن‌دهی شده‌اند: A_ij = 0.6·PMI(i,j) + 0.4·cos_sim(embed_i, embed_j). سه تکرار انتشار پیام (message-passing) با تجمیع وزن‌دار-توجهی (attention-weighted aggregation) پیش‌بینی‌های اولیه را پالایش می‌کنند، و MS-COCO بهبود ۸.۳٪+ mAP را از پالایش GCN نشان می‌دهد.
+هایپراِج‌ها برای خوشه‌های تکنیک فراتر از روابط دوتایی گسترش می‌یابند. ترکیب‌های رایج پروپاگاندا هایپراِج‌های طبیعی را تشکیل می‌ده دهند: {Loaded Language, Name Calling, Labeling} برای حملات شخصیتی، {Bandwagon, Flag-waving, Appeal to Authority} برای فشار همنوایی، {Fear Appeal, Causal Oversimplification, False Dilemma} برای روایت‌های تهدید. وزن‌های فعال‌سازی مخصوص نمونه، انتخاب خوشه وابسته به زمینه را امکان‌پذیر می‌سازد.
+یادگیری انتقالی و افزایش داده (data augmentation) کمبود داده را جبران می‌کنند
+یادگیری انتقالی دو مرحله‌ای (مجموعه داده PTC ← داده‌های وظیفه) بهبودهای مداوم ۲-۴٪ را در SemEval-2021 فراهم کرد. بیش از ۲۰٬۰۰۰ جمله حاشیه‌نویسی‌شده از پروپاداندای خبری، نمونه‌های تکنیک غنی را برای پیش‌آموزش انکودرهای متنی ارائه می‌دهند.
+
