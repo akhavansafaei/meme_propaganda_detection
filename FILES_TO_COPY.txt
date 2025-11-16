@@ -1,0 +1,47 @@
+==========================================================
+THREE-STREAM ARCHITECTURE FILES
+Location: /home/user/meme_propaganda_detection/
+==========================================================
+
+📁 NEW FILES I CREATED (copy these to Google Drive):
+
+1. config.py
+2. data_loader.py  
+3. neural_stream.py
+4. kg_stream.py
+5. llm_stream.py
+6. fusion.py
+7. pipeline.py
+8. trainer.py
+9. three_stream_experiment.ipynb
+10. README_THREE_STREAM.md
+11. IMPLEMENTATION_SUMMARY.md
+
+📁 EXISTING FILES (also needed):
+
+12. prerequisite_checker.py
+13. knowledge_graph.py
+14. propaganda_techniques.json
+
+==========================================================
+TOTAL: 14 files
+==========================================================
+
+🚀 TO USE IN GOOGLE COLAB:
+
+1. Upload ALL 14 files to your Google Drive folder:
+   /MyDrive/propaganda_detection/
+
+2. In Colab, mount Drive:
+   from google.colab import drive
+   drive.mount('/content/drive')
+
+3. Navigate to project:
+   import os, sys
+   os.chdir('/content/drive/MyDrive/propaganda_detection')
+   sys.path.append('/content/drive/MyDrive/propaganda_detection')
+
+4. Open the notebook:
+   three_stream_experiment.ipynb
+
+==========================================================
