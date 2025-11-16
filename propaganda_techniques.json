@@ -1,0 +1,228 @@
+{
+  "propaganda_techniques": [
+    {
+      "id": 1,
+      "name": "Appeal to (Strong) Emotions",
+      "category": "Pathos",
+      "prerequisite": "Presence of emotionally charged words or visuals (anger, pride, fear, sadness).",
+      "check_method": ["emotion_lexicon", "sentiment_analysis", "visual_emotion_recognition"],
+      "patterns": ["extreme emotional language", "emotional imagery", "fear/anger/pride triggers"],
+      "keywords": ["outraged", "furious", "terrified", "proud", "ashamed", "horrified"]
+    },
+    {
+      "id": 2,
+      "name": "Appeal to Authority",
+      "category": "Ethos",
+      "prerequisite": "A recognizable authority figure or organization is mentioned.",
+      "check_method": ["entity_recognition", "authority_database_lookup"],
+      "patterns": ["expert says", "scientists confirm", "doctors recommend"],
+      "keywords": ["Dr.", "Prof.", "expert", "scientist", "study shows", "research proves"],
+      "entities_required": true
+    },
+    {
+      "id": 3,
+      "name": "Appeal to Fear/Prejudice",
+      "category": "Pathos",
+      "prerequisite": "Language or imagery that evokes fear or hatred toward a group or threat.",
+      "check_method": ["fear_lexicon", "group_reference_detection"],
+      "patterns": ["they will destroy", "coming for you", "take away your"],
+      "keywords": ["danger", "threat", "destroy", "invasion", "take over", "eliminate"]
+    },
+    {
+      "id": 4,
+      "name": "Bandwagon",
+      "category": "Justification",
+      "prerequisite": "Presence of collective behavior or conformity statements (e.g., 'everyone does it').",
+      "check_method": ["pattern_matching_collectivism"],
+      "patterns": ["everyone", "nobody", "all", "no one"],
+      "keywords": ["everyone", "everybody", "nobody", "all of us", "join the crowd", "don't be left behind"]
+    },
+    {
+      "id": 5,
+      "name": "Black-and-White Fallacy",
+      "category": "Logos",
+      "prerequisite": "Binary contrast with no middle ground (e.g., 'with us or against us').",
+      "check_method": ["contrastive_pattern_detection", "logical_structure_analysis"],
+      "patterns": ["either...or", "with us or against us", "only two choices"],
+      "keywords": ["either", "or else", "only option", "no other way", "must choose"]
+    },
+    {
+      "id": 6,
+      "name": "Causal Oversimplification",
+      "category": "Logos",
+      "prerequisite": "Presence of causal connection markers ('because', 'therefore') linking complex events simplistically.",
+      "check_method": ["dependency_parsing", "causal_marker_detection"],
+      "patterns": ["X causes Y", "because of X", "therefore Y"],
+      "keywords": ["because", "therefore", "thus", "hence", "as a result", "leads to", "causes"]
+    },
+    {
+      "id": 7,
+      "name": "Doubt",
+      "category": "Disinformation",
+      "prerequisite": "Use of uncertain or skeptical expressions ('maybe', 'allegedly', 'not sure').",
+      "check_method": ["uncertainty_lexicon"],
+      "patterns": ["allegedly", "supposedly", "they claim", "so-called"],
+      "keywords": ["allegedly", "supposedly", "claim", "so-called", "maybe", "perhaps", "doubt", "question"]
+    },
+    {
+      "id": 8,
+      "name": "Exaggeration/Minimisation",
+      "category": "Justification",
+      "prerequisite": "Presence of extreme adjectives/adverbs ('always', 'never', 'best', 'worst').",
+      "check_method": ["intensity_scoring"],
+      "patterns": ["always", "never", "best ever", "worst possible"],
+      "keywords": ["always", "never", "best", "worst", "greatest", "terrible", "perfect", "disaster"]
+    },
+    {
+      "id": 9,
+      "name": "Flag-waving",
+      "category": "Pathos",
+      "prerequisite": "Reference to national symbols, identity, or patriotic sentiment.",
+      "check_method": ["symbol_detection", "nationality_entity_recognition"],
+      "patterns": ["our country", "patriot", "national pride"],
+      "keywords": ["patriot", "country", "nation", "homeland", "flag", "freedom", "liberty"],
+      "visual_symbols": ["flag", "national emblem", "military uniform"]
+    },
+    {
+      "id": 10,
+      "name": "Glittering Generalities",
+      "category": "Justification",
+      "prerequisite": "Use of vague but positive concepts ('freedom', 'honor', 'justice').",
+      "check_method": ["semantic_pattern_matching", "virtue_wordlist_check"],
+      "patterns": ["abstract virtues without specifics"],
+      "keywords": ["freedom", "justice", "honor", "truth", "democracy", "progress", "change", "hope"]
+    },
+    {
+      "id": 11,
+      "name": "Loaded Language",
+      "category": "Justification",
+      "prerequisite": "Use of emotionally charged or evaluative language.",
+      "check_method": ["emotionally_weighted_wordlist"],
+      "patterns": ["highly charged adjectives", "emotional labels"],
+      "keywords": ["terrorist", "hero", "monster", "angel", "evil", "pure", "corrupt", "traitor"]
+    },
+    {
+      "id": 12,
+      "name": "Misrepresentation (Straw Man)",
+      "category": "Logos",
+      "prerequisite": "Mention of another person's viewpoint followed by distorted restatement.",
+      "check_method": ["coreference_resolution", "argument_comparison"],
+      "patterns": ["they want to", "they think", "they believe"],
+      "keywords": ["they want", "they think", "so you're saying", "what you really mean"]
+    },
+    {
+      "id": 13,
+      "name": "Name Calling/Labeling",
+      "category": "Ethos",
+      "prerequisite": "Negative labels or adjectives attached to a person or group.",
+      "check_method": ["entity_adjective_pairing", "sentiment_analysis"],
+      "patterns": ["person/group + negative label"],
+      "keywords": ["idiot", "fool", "radical", "extremist", "puppet", "sheep", "thug"]
+    },
+    {
+      "id": 14,
+      "name": "Obfuscation/Vagueness",
+      "category": "Disinformation",
+      "prerequisite": "Ambiguous statements or undefined references.",
+      "check_method": ["linguistic_complexity_analysis", "pronoun_resolution_failure"],
+      "patterns": ["unclear pronouns", "vague references", "complex jargon"],
+      "keywords": ["some people", "they", "sources", "it", "things", "stuff", "issues"]
+    },
+    {
+      "id": 15,
+      "name": "Red Herring",
+      "category": "Logos",
+      "prerequisite": "Sudden topic shift or introduction of unrelated information.",
+      "check_method": ["topic_shift_detection", "semantic_relevance_check"],
+      "patterns": ["but what about", "speaking of which", "by the way"],
+      "keywords": ["but", "however", "what about", "meanwhile", "speaking of"]
+    },
+    {
+      "id": 16,
+      "name": "Reductio ad Hitlerum",
+      "category": "Ethos",
+      "prerequisite": "Explicit reference to Nazis, Hitler, or fascism in comparison.",
+      "check_method": ["named_entity_matching"],
+      "patterns": ["like Hitler", "Nazi", "fascist"],
+      "keywords": ["Hitler", "Nazi", "fascist", "Holocaust", "genocide", "Third Reich"],
+      "entities_required": true
+    },
+    {
+      "id": 17,
+      "name": "Repetition",
+      "category": "Justification",
+      "prerequisite": "Reappearance of key phrases or words multiple times.",
+      "check_method": ["token_frequency_tracking"],
+      "patterns": ["repeated words/phrases"],
+      "keywords": [],
+      "min_repetitions": 3
+    },
+    {
+      "id": 18,
+      "name": "Slogans",
+      "category": "Justification",
+      "prerequisite": "Short, catchy, and rhythmic phrase used for persuasion.",
+      "check_method": ["phrase_length_check", "syntactic_simplicity"],
+      "patterns": ["short catchy phrases", "rhyming", "alliteration"],
+      "keywords": [],
+      "max_words": 8
+    },
+    {
+      "id": 19,
+      "name": "Smears",
+      "category": "Ethos",
+      "prerequisite": "Personal attack undermining credibility of a person or group.",
+      "check_method": ["sentiment_polarity_toward_entity", "attack_verb_detection"],
+      "patterns": ["person + attack on character"],
+      "keywords": ["corrupt", "liar", "criminal", "fraud", "cheater", "dishonest"],
+      "entities_required": true
+    },
+    {
+      "id": 20,
+      "name": "Thought-Terminating Cliche",
+      "category": "Justification",
+      "prerequisite": "Common cliche that shuts down discussion ('It is what it is').",
+      "check_method": ["cliche_phrase_list"],
+      "patterns": ["fixed cliche phrases"],
+      "keywords": ["it is what it is", "boys will be boys", "that's life", "end of story", "period", "case closed"]
+    },
+    {
+      "id": 21,
+      "name": "Transfer",
+      "category": "Pathos",
+      "prerequisite": "Visual or symbolic association transferring emotion or value.",
+      "check_method": ["visual_symbolism_detection", "image_text_alignment"],
+      "patterns": ["symbolic imagery", "emotional association"],
+      "keywords": [],
+      "visual_symbols": ["flag", "religious symbol", "leader portrait", "logo"],
+      "requires_visual": true
+    },
+    {
+      "id": 22,
+      "name": "Whataboutism",
+      "category": "Logos",
+      "prerequisite": "Explicit or implicit comparison between two unrelated cases.",
+      "check_method": ["comparative_pattern_detection", "discourse_relation_analysis"],
+      "patterns": ["but what about", "while you", "compared to"],
+      "keywords": ["but what about", "what about", "while you", "compared to", "on the other hand"]
+    }
+  ],
+  "hierarchical_structure": {
+    "Ethos": ["Appeal to Authority", "Name Calling/Labeling", "Smears", "Reductio ad Hitlerum"],
+    "Pathos": ["Appeal to (Strong) Emotions", "Appeal to Fear/Prejudice", "Flag-waving", "Transfer"],
+    "Logos": ["Black-and-White Fallacy", "Causal Oversimplification", "Misrepresentation (Straw Man)", "Red Herring", "Whataboutism"],
+    "Justification": ["Bandwagon", "Exaggeration/Minimisation", "Glittering Generalities", "Loaded Language", "Repetition", "Slogans", "Thought-Terminating Cliche"],
+    "Disinformation": ["Doubt", "Obfuscation/Vagueness"]
+  },
+  "co_occurrence_clusters": [
+    ["Loaded Language", "Name Calling/Labeling", "Smears"],
+    ["Appeal to Fear/Prejudice", "Flag-waving", "Transfer"],
+    ["Doubt", "Obfuscation/Vagueness"],
+    ["Bandwagon", "Glittering Generalities"],
+    ["Whataboutism", "Red Herring"]
+  ],
+  "mutual_exclusions": [
+    ["Black-and-White Fallacy", "Causal Oversimplification"],
+    ["Whataboutism", "Misrepresentation (Straw Man)"]
+  ]
+}
