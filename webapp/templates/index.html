@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -41,6 +41,22 @@
             opacity: 0.9;
         }
 
+        .model-status {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .model-status.real {
+            background: rgba(72, 187, 120, 0.3);
+        }
+
+        .model-status.simulated {
+            background: rgba(237, 137, 54, 0.3);
+        }
+
         .main-content {
             background: white;
             border-radius: 20px;
@@ -49,7 +65,6 @@
         }
 
         .upload-section {
-            text-align: center;
             margin-bottom: 30px;
         }
 
@@ -60,6 +75,7 @@
             background: #f8f9ff;
             cursor: pointer;
             transition: all 0.3s ease;
+            text-align: center;
         }
 
         .upload-box:hover {
@@ -90,6 +106,45 @@
 
         #fileInput {
             display: none;
+        }
+
+        /* Ground Truth Input */
+        .ground-truth-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #edf2f7;
+            border-radius: 10px;
+            border-right: 5px solid #4299e1;
+        }
+
+        .ground-truth-section h3 {
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+
+        .technique-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .technique-checkbox {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .technique-checkbox:hover {
+            background: #f0f4f8;
+        }
+
+        .technique-checkbox input {
+            margin-left: 10px;
         }
 
         .btn {
@@ -155,7 +210,41 @@
             display: block;
         }
 
-        .detected-techniques {
+        /* Metrics Display */
+        .metrics-box {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .metric-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .detected-techniques, .ground-truth-display {
             margin-bottom: 30px;
         }
 
@@ -186,6 +275,26 @@
             border-color: #48bb78;
         }
 
+        .technique-card.ground-truth {
+            background: #fffaf0;
+            border-color: #ed8936;
+        }
+
+        .technique-card.both {
+            background: #e6fffa;
+            border-color: #319795;
+        }
+
+        .technique-card.false-positive {
+            background: #fff5f5;
+            border-color: #f56565;
+        }
+
+        .technique-card.false-negative {
+            background: #fffaf0;
+            border-color: #ed8936;
+        }
+
         .technique-name {
             font-size: 1.3em;
             font-weight: bold;
@@ -202,12 +311,6 @@
             font-size: 0.8em;
             margin-left: 10px;
         }
-
-        .technique-category.Ethos { background: #f56565; }
-        .technique-category.Pathos { background: #ed8936; }
-        .technique-category.Logos { background: #4299e1; }
-        .technique-category.Justification { background: #48bb78; }
-        .technique-category.Disinformation { background: #9f7aea; }
 
         .score-bar-container {
             background: #e2e8f0;
@@ -235,29 +338,58 @@
             font-size: 0.9em;
         }
 
-        .all-scores {
-            margin-top: 30px;
-        }
-
-        .score-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-            padding: 10px;
-            background: #f8f9ff;
-            border-radius: 8px;
-        }
-
-        .score-label {
-            flex: 1;
-            font-weight: 500;
-        }
-
-        .score-value {
-            width: 60px;
-            text-align: left;
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
             font-weight: bold;
-            color: #667eea;
+            margin-left: 5px;
+        }
+
+        .badge.true-positive {
+            background: #48bb78;
+            color: white;
+        }
+
+        .badge.false-positive {
+            background: #f56565;
+            color: white;
+        }
+
+        .badge.false-negative {
+            background: #ed8936;
+            color: white;
+        }
+
+        .badge.ground-truth {
+            background: #ed8936;
+            color: white;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .upload-box {
+                padding: 40px 15px;
+            }
         }
 
         .error {
@@ -272,20 +404,6 @@
         .reset-btn {
             background: #718096;
             margin-right: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-
-            .main-content {
-                padding: 20px;
-            }
-
-            .upload-box {
-                padding: 40px 15px;
-            }
         }
 
         .info-box {
@@ -309,25 +427,6 @@
         .info-box li {
             margin-bottom: 5px;
         }
-
-        .badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-            margin-right: 5px;
-        }
-
-        .badge.detected {
-            background: #48bb78;
-            color: white;
-        }
-
-        .badge.low {
-            background: #cbd5e0;
-            color: #4a5568;
-        }
     </style>
 </head>
 <body>
@@ -335,6 +434,9 @@
         <div class="header">
             <h1>🔍 تشخیص پروپاگاندا در میم‌ها</h1>
             <p>Meme Propaganda Detection using AI & Knowledge Graph</p>
+            <div class="model-status" id="modelStatus">
+                <span id="modelStatusText">⏳ در حال بارگذاری...</span>
+            </div>
         </div>
 
         <div class="main-content">
@@ -345,6 +447,18 @@
                     <div class="upload-subtext">فرمت‌های مجاز: JPG, PNG, GIF (حداکثر 16MB)</div>
                     <input type="file" id="fileInput" accept="image/*">
                 </div>
+
+                <!-- Ground Truth Input (اختیاری) -->
+                <div class="ground-truth-section">
+                    <h3>📋 لیبل‌های واقعی (Ground Truth) - اختیاری</h3>
+                    <p style="color: #718096; margin-bottom: 10px;">
+                        اگه لیبل‌های درست این میم رو میدونی، انتخاب کن تا مقایسه کنیم:
+                    </p>
+                    <div class="technique-selector" id="techniqueSelector">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+
                 <button class="btn" id="analyzeBtn" disabled>🔬 تحلیل میم</button>
 
                 <div class="info-box">
@@ -353,7 +467,7 @@
                         <li>مدل هوش مصنوعی AdaBoost Ensemble برای تشخیص اولیه</li>
                         <li>Knowledge Graph برای بهبود دقت و حذف False Positives</li>
                         <li>تشخیص 22 تکنیک پروپاگاندا مختلف</li>
-                        <li>دقت بالای 75% (Hierarchical F1)</li>
+                        <li>مقایسه با لیبل‌های واقعی و محاسبه Precision, Recall, F1</li>
                     </ul>
                 </div>
             </div>
@@ -368,14 +482,12 @@
             <div class="results" id="results">
                 <div class="image-preview" id="imagePreview"></div>
 
-                <div class="detected-techniques">
-                    <h2 class="section-title">✅ تکنیک‌های پروپاگاندا شناسایی شده</h2>
-                    <div id="detectedList"></div>
-                </div>
+                <!-- Metrics (if ground truth available) -->
+                <div id="metricsBox" style="display: none;"></div>
 
-                <div class="all-scores">
-                    <h2 class="section-title">📈 امتیازات تمام تکنیک‌ها</h2>
-                    <div id="allScores"></div>
+                <div class="detected-techniques">
+                    <h2 class="section-title">🎯 نتایج تحلیل</h2>
+                    <div id="detectedList"></div>
                 </div>
 
                 <div style="text-align: center; margin-top: 30px;">
@@ -393,8 +505,27 @@
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
         const error = document.getElementById('error');
+        const techniqueSelector = document.getElementById('techniqueSelector');
 
         let selectedFile = null;
+        let allTechniques = [];
+
+        // Load techniques list
+        fetch('/techniques')
+            .then(response => response.json())
+            .then(techniques => {
+                allTechniques = techniques;
+                renderTechniqueSelector(techniques);
+            });
+
+        function renderTechniqueSelector(techniques) {
+            techniqueSelector.innerHTML = techniques.map(tech => `
+                <label class="technique-checkbox">
+                    <input type="checkbox" value="${tech.name}" class="ground-truth-checkbox">
+                    <span>${tech.name}</span>
+                </label>
+            `).join('');
+        }
 
         // Click to upload
         uploadBox.addEventListener('click', () => fileInput.click());
@@ -446,6 +577,15 @@
             const formData = new FormData();
             formData.append('file', selectedFile);
 
+            // Get selected ground truth
+            const selectedGroundTruth = Array.from(
+                document.querySelectorAll('.ground-truth-checkbox:checked')
+            ).map(cb => cb.value);
+
+            if (selectedGroundTruth.length > 0) {
+                formData.append('ground_truth', JSON.stringify(selectedGroundTruth));
+            }
+
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
@@ -457,6 +597,9 @@
                 if (!response.ok) {
                     throw new Error(data.error || 'خطا در تحلیل تصویر');
                 }
+
+                // Update model status
+                updateModelStatus(data.using_real_model);
 
                 // Display results
                 displayResults(data);
@@ -470,50 +613,113 @@
             }
         }
 
+        function updateModelStatus(usingRealModel) {
+            const statusEl = document.getElementById('modelStatus');
+            const statusText = document.getElementById('modelStatusText');
+
+            if (usingRealModel) {
+                statusEl.className = 'model-status real';
+                statusText.textContent = '✅ مدل واقعی فعال';
+            } else {
+                statusEl.className = 'model-status simulated';
+                statusText.textContent = '⚠️ شبیه‌سازی (مدل واقعی وصل نیست)';
+            }
+        }
+
         function displayResults(data) {
             // Show image
             const imagePreview = document.getElementById('imagePreview');
             imagePreview.innerHTML = `<img src="${data.image_data}" alt="Uploaded meme">`;
 
-            // Show detected techniques
-            const detectedList = document.getElementById('detectedList');
-            if (data.detected_techniques.length > 0) {
-                detectedList.innerHTML = data.detected_techniques.map(tech => {
-                    const techData = data.all_predictions[tech];
-                    const category = getCategoryForTechnique(tech);
-                    return `
-                        <div class="technique-card detected">
-                            <div class="technique-name">
-                                <span class="badge detected">شناسایی شد</span>
-                                ${tech}
-                                <span class="technique-category ${category}">${category}</span>
-                            </div>
-                            <div class="score-bar-container">
-                                <div class="score-bar" style="width: ${techData.final_score * 100}%"></div>
-                                <span class="score-text">${(techData.final_score * 100).toFixed(1)}%</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                detectedList.innerHTML = '<p style="text-align: center; color: #718096;">هیچ تکنیک پروپاگاندایی شناسایی نشد</p>';
+            // Show metrics if ground truth available
+            if (data.metrics) {
+                displayMetrics(data.metrics);
             }
 
-            // Show all scores
-            const allScores = document.getElementById('allScores');
-            allScores.innerHTML = Object.entries(data.all_predictions)
-                .slice(0, 10)  // Top 10
-                .map(([tech, scores]) => `
-                    <div class="score-item">
-                        <div class="score-label">
-                            ${scores.detected ? '<span class="badge detected">✓</span>' : '<span class="badge low">○</span>'}
-                            ${tech}
-                        </div>
-                        <div class="score-value">${(scores.final_score * 100).toFixed(1)}%</div>
-                    </div>
-                `).join('');
+            // Show techniques with ground truth comparison
+            displayTechniques(data);
 
             results.style.display = 'block';
+        }
+
+        function displayMetrics(metrics) {
+            const metricsBox = document.getElementById('metricsBox');
+            metricsBox.style.display = 'block';
+            metricsBox.innerHTML = `
+                <div class="metrics-box">
+                    <h3 style="margin-bottom: 15px;">📊 مقایسه با لیبل‌های واقعی</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-item">
+                            <div class="metric-value">${(metrics.precision * 100).toFixed(0)}%</div>
+                            <div class="metric-label">Precision (دقت)</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">${(metrics.recall * 100).toFixed(0)}%</div>
+                            <div class="metric-label">Recall (بازیابی)</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value">${(metrics.f1 * 100).toFixed(0)}%</div>
+                            <div class="metric-label">F1 Score</div>
+                        </div>
+                    </div>
+                    <p style="margin-top: 15px; font-size: 0.9em;">
+                        ✓ ${metrics.true_positives} درست |
+                        ✗ ${metrics.false_positives} اشتباه مثبت |
+                        ✗ ${metrics.false_negatives} از قلم افتاده
+                    </p>
+                </div>
+            `;
+        }
+
+        function displayTechniques(data) {
+            const detectedList = document.getElementById('detectedList');
+            const hasGroundTruth = data.ground_truth && data.ground_truth.length > 0;
+
+            const techniques = Object.entries(data.all_predictions);
+
+            detectedList.innerHTML = techniques.map(([tech, scores]) => {
+                let cardClass = 'technique-card';
+                let badgeHtml = '';
+
+                if (hasGroundTruth) {
+                    if (scores.is_ground_truth && scores.detected) {
+                        cardClass += ' both';
+                        badgeHtml = '<span class="badge true-positive">✓ True Positive</span>';
+                    } else if (scores.is_ground_truth && !scores.detected) {
+                        cardClass += ' false-negative';
+                        badgeHtml = '<span class="badge false-negative">✗ False Negative</span>';
+                    } else if (!scores.is_ground_truth && scores.detected) {
+                        cardClass += ' false-positive';
+                        badgeHtml = '<span class="badge false-positive">✗ False Positive</span>';
+                    } else if (scores.is_ground_truth) {
+                        badgeHtml = '<span class="badge ground-truth">Ground Truth</span>';
+                    }
+                } else if (scores.detected) {
+                    cardClass += ' detected';
+                    badgeHtml = '<span class="badge true-positive">شناسایی شد</span>';
+                }
+
+                const category = getCategoryForTechnique(tech);
+
+                return `
+                    <div class="${cardClass}">
+                        <div class="technique-name">
+                            ${badgeHtml}
+                            ${tech}
+                            <span class="technique-category ${category}">${category}</span>
+                        </div>
+                        <div style="font-size: 0.9em; color: #718096; margin-top: 5px;">
+                            Neural: ${(scores.neural_score * 100).toFixed(1)}% →
+                            KG: ${(scores.kg_score * 100).toFixed(1)}% →
+                            Final: ${(scores.final_score * 100).toFixed(1)}%
+                        </div>
+                        <div class="score-bar-container">
+                            <div class="score-bar" style="width: ${scores.final_score * 100}%"></div>
+                            <span class="score-text">${(scores.final_score * 100).toFixed(1)}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function getCategoryForTechnique(technique) {
@@ -552,6 +758,9 @@
             uploadSection.style.display = 'block';
             results.style.display = 'none';
             error.style.display = 'none';
+
+            // Uncheck all ground truth checkboxes
+            document.querySelectorAll('.ground-truth-checkbox').forEach(cb => cb.checked = false);
         }
     </script>
 </body>
