@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تشخیص پروپاگاندا در میم‌ها | Meme Propaganda Detector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            direction: rtl;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-box:hover {
+            background: #f0f2ff;
+            border-color: #764ba2;
+        }
+
+        .upload-box.dragover {
+            background: #e8ebff;
+            border-color: #5a67d8;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.3em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #718096;
+            font-size: 0.9em;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .image-preview {
+            max-width: 600px;
+            margin: 0 auto 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .image-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        .detected-techniques {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .technique-card {
+            background: #f7fafc;
+            border-right: 5px solid #667eea;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .technique-card:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .technique-card.detected {
+            background: #f0fff4;
+            border-color: #48bb78;
+        }
+
+        .technique-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .technique-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .technique-category.Ethos { background: #f56565; }
+        .technique-category.Pathos { background: #ed8936; }
+        .technique-category.Logos { background: #4299e1; }
+        .technique-category.Justification { background: #48bb78; }
+        .technique-category.Disinformation { background: #9f7aea; }
+
+        .score-bar-container {
+            background: #e2e8f0;
+            height: 25px;
+            border-radius: 12px;
+            margin-top: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .score-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            border-radius: 12px;
+        }
+
+        .score-text {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            color: #2d3748;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .all-scores {
+            margin-top: 30px;
+        }
+
+        .score-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9ff;
+            border-radius: 8px;
+        }
+
+        .score-label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .score-value {
+            width: 60px;
+            text-align: left;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-right: 5px solid #fc8181;
+        }
+
+        .reset-btn {
+            background: #718096;
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .upload-box {
+                padding: 40px 15px;
+            }
+        }
+
+        .info-box {
+            background: #edf2f7;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+            border-right: 5px solid #4299e1;
+        }
+
+        .info-box h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            list-style-position: inside;
+            color: #4a5568;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .badge.detected {
+            background: #48bb78;
+            color: white;
+        }
+
+        .badge.low {
+            background: #cbd5e0;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 تشخیص پروپاگاندا در میم‌ها</h1>
+            <p>Meme Propaganda Detection using AI & Knowledge Graph</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-box" id="uploadBox">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">میم خود را اینجا بکشید یا کلیک کنید</div>
+                    <div class="upload-subtext">فرمت‌های مجاز: JPG, PNG, GIF (حداکثر 16MB)</div>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+                <button class="btn" id="analyzeBtn" disabled>🔬 تحلیل میم</button>
+
+                <div class="info-box">
+                    <h3>📊 این سیستم چطور کار می‌کنه؟</h3>
+                    <ul>
+                        <li>مدل هوش مصنوعی AdaBoost Ensemble برای تشخیص اولیه</li>
+                        <li>Knowledge Graph برای بهبود دقت و حذف False Positives</li>
+                        <li>تشخیص 22 تکنیک پروپاگاندا مختلف</li>
+                        <li>دقت بالای 75% (Hierarchical F1)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>در حال تحلیل میم... لطفاً صبر کنید</p>
+            </div>
+
+            <div class="error" id="error" style="display: none;"></div>
+
+            <div class="results" id="results">
+                <div class="image-preview" id="imagePreview"></div>
+
+                <div class="detected-techniques">
+                    <h2 class="section-title">✅ تکنیک‌های پروپاگاندا شناسایی شده</h2>
+                    <div id="detectedList"></div>
+                </div>
+
+                <div class="all-scores">
+                    <h2 class="section-title">📈 امتیازات تمام تکنیک‌ها</h2>
+                    <div id="allScores"></div>
+                </div>
+
+                <div style="text-align: center; margin-top: 30px;">
+                    <button class="btn reset-btn" onclick="resetApp()">🔄 آپلود میم جدید</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const uploadSection = document.getElementById('uploadSection');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const error = document.getElementById('error');
+
+        let selectedFile = null;
+
+        // Click to upload
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        // File selected
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                uploadBox.querySelector('.upload-text').textContent = '✓ ' + selectedFile.name;
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        // Drag and drop
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+
+            if (e.dataTransfer.files.length > 0) {
+                selectedFile = e.dataTransfer.files[0];
+                fileInput.files = e.dataTransfer.files;
+                uploadBox.querySelector('.upload-text').textContent = '✓ ' + selectedFile.name;
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        // Analyze button
+        analyzeBtn.addEventListener('click', analyzeImage);
+
+        async function analyzeImage() {
+            if (!selectedFile) return;
+
+            // Show loading
+            uploadSection.style.display = 'none';
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            results.style.display = 'none';
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'خطا در تحلیل تصویر');
+                }
+
+                // Display results
+                displayResults(data);
+
+            } catch (err) {
+                error.textContent = '❌ ' + err.message;
+                error.style.display = 'block';
+                uploadSection.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            // Show image
+            const imagePreview = document.getElementById('imagePreview');
+            imagePreview.innerHTML = `<img src="${data.image_data}" alt="Uploaded meme">`;
+
+            // Show detected techniques
+            const detectedList = document.getElementById('detectedList');
+            if (data.detected_techniques.length > 0) {
+                detectedList.innerHTML = data.detected_techniques.map(tech => {
+                    const techData = data.all_predictions[tech];
+                    const category = getCategoryForTechnique(tech);
+                    return `
+                        <div class="technique-card detected">
+                            <div class="technique-name">
+                                <span class="badge detected">شناسایی شد</span>
+                                ${tech}
+                                <span class="technique-category ${category}">${category}</span>
+                            </div>
+                            <div class="score-bar-container">
+                                <div class="score-bar" style="width: ${techData.final_score * 100}%"></div>
+                                <span class="score-text">${(techData.final_score * 100).toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                detectedList.innerHTML = '<p style="text-align: center; color: #718096;">هیچ تکنیک پروپاگاندایی شناسایی نشد</p>';
+            }
+
+            // Show all scores
+            const allScores = document.getElementById('allScores');
+            allScores.innerHTML = Object.entries(data.all_predictions)
+                .slice(0, 10)  // Top 10
+                .map(([tech, scores]) => `
+                    <div class="score-item">
+                        <div class="score-label">
+                            ${scores.detected ? '<span class="badge detected">✓</span>' : '<span class="badge low">○</span>'}
+                            ${tech}
+                        </div>
+                        <div class="score-value">${(scores.final_score * 100).toFixed(1)}%</div>
+                    </div>
+                `).join('');
+
+            results.style.display = 'block';
+        }
+
+        function getCategoryForTechnique(technique) {
+            const categories = {
+                'Appeal to Authority': 'Ethos',
+                'Name Calling/Labeling': 'Ethos',
+                'Smears': 'Ethos',
+                'Reductio ad Hitlerum': 'Ethos',
+                'Appeal to (Strong) Emotions': 'Pathos',
+                'Appeal to Fear/Prejudice': 'Pathos',
+                'Flag-waving': 'Pathos',
+                'Transfer': 'Pathos',
+                'Black-and-White Fallacy': 'Logos',
+                'Causal Oversimplification': 'Logos',
+                'Misrepresentation (Straw Man)': 'Logos',
+                'Red Herring': 'Logos',
+                'Whataboutism': 'Logos',
+                'Bandwagon': 'Justification',
+                'Exaggeration/Minimisation': 'Justification',
+                'Glittering Generalities': 'Justification',
+                'Loaded Language': 'Justification',
+                'Repetition': 'Justification',
+                'Slogans': 'Justification',
+                'Thought-Terminating Cliche': 'Justification',
+                'Doubt': 'Disinformation',
+                'Obfuscation/Vagueness': 'Disinformation'
+            };
+            return categories[technique] || 'Other';
+        }
+
+        function resetApp() {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadBox.querySelector('.upload-text').textContent = 'میم خود را اینجا بکشید یا کلیک کنید';
+            analyzeBtn.disabled = true;
+            uploadSection.style.display = 'block';
+            results.style.display = 'none';
+            error.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
